@@ -1,0 +1,61 @@
+#compdef shell-switch
+
+_shell_switch() {
+    local -a commands rices profiles
+
+    commands=(
+        'list:List all available desktop shell profiles'
+        'ls:List all available desktop shell profiles'
+        'current:Show currently active shell'
+        'get:Download and install a popular desktop rice'
+        'backup:Create a snapshot of current desktop configuration'
+        'clone:Clone a GitHub dotfiles repository as a shell profile'
+        'add:Create a new shell profile template'
+        'remove:Delete an installed shell profile'
+        'rm:Delete an installed shell profile'
+        'gui:Launch native Libadwaita desktop switcher'
+        'menu:Open fast rofi/fuzzel quick picker'
+        'help:Show help message'
+    )
+
+    rices=(
+        'caelestia:Quickshell desktop shell with dynamic colors & drawers'
+        'hyde:HyDE Project modular desktop with Waybar & dynamic themes'
+        'dms:Material 3 Quickshell desktop shell with dock'
+        'end4:end-4 Material You desktop with Quickshell ii suite'
+        'ml4w:MyLinuxForWork modular Hyprland desktop with Waybar & Rofi'
+        '44dots:Arch Linux & Hyprland rice with Waybar & SwayNC'
+    )
+
+    local profiles_dir="${HOME}/.config/desktop-shells"
+    if [[ -d "${profiles_dir}" ]]; then
+        for p in "${profiles_dir}"/*(/N); do
+            local pname="${p:t}"
+            profiles+=("${pname}:${pname} shell profile")
+        done
+    fi
+
+    _arguments -C \
+        '1: :->command_or_profile' \
+        '2: :->argument' \
+        && return 0
+
+    case "$state" in
+        command_or_profile)
+            _describe -t commands 'command' commands
+            _describe -t profiles 'installed shell profile' profiles
+            ;;
+        argument)
+            case "$words[2]" in
+                get)
+                    _describe -t rices 'available rice' rices
+                    ;;
+                remove|rm|delete)
+                    _describe -t profiles 'profile to remove' profiles
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_shell_switch "$@"

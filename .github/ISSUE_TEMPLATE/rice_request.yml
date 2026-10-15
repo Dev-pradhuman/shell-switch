@@ -1,0 +1,50 @@
+name: 🎨 Rice Adapter Request
+description: Request an out-of-the-box adapter profile for a popular desktop rice or dotfiles repository.
+title: "[Rice Request]: "
+labels: ["rice-request", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🎨 Request a New Rice Profile Adapter
+        Suggest a dotfiles setup or desktop shell to include in the official catalog (`shell-switch get`) and `example-profiles/`.
+
+  - type: input
+    id: rice_name
+    attributes:
+      label: Rice Name
+      description: The name of the desktop setup or rice
+      placeholder: "e.g. Catppuccin Hyprland Suite"
+    validations:
+      required: true
+
+  - type: input
+    id: repo_url
+    attributes:
+      label: Repository URL
+      description: Link to the GitHub / GitLab / Codeberg repository
+      placeholder: "https://github.com/author/dotfiles"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: components
+    attributes:
+      label: Desktop Components Used
+      description: Which status bars, widgets, and notification daemons does this rice use?
+      options:
+        - label: Waybar
+        - label: Quickshell (QtQuick/QML)
+        - label: AGS (Aylur's GTK Shell)
+        - label: Eww (ElKowar's Wacky Widgets)
+        - label: SwayNotificationCenter (SwayNC)
+        - label: Dunst / Mako
+        - label: Rofi / Wofi / Fuzzel
+        - label: Hyprpaper / SWWW / MPVpaper
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Special Requirements or Launch Hooks
+      description: Any required daemon startup commands, environment variables, or scripts.
+      placeholder: "Requires 'swww init' before starting waybar..."

@@ -59,7 +59,22 @@ if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "${DESKTOP_DIR}" >/dev/null 2>&1 || true
 fi
 
-# 5. Populate example profiles if profiles directory is empty
+# 5. Install shell completions
+echo -e "${BOLD}Installing shell auto-completions (Bash, Zsh, Fish)...${RESET}"
+BASH_COMP_DIR="${HOME}/.local/share/bash-completion/completions"
+ZSH_COMP_DIR="${HOME}/.local/share/zsh/site-functions"
+FISH_COMP_DIR="${HOME}/.config/fish/completions"
+
+mkdir -p "${BASH_COMP_DIR}" "${ZSH_COMP_DIR}" "${FISH_COMP_DIR}"
+cp -f "${SCRIPT_DIR}/completions/shell-switch.bash" "${BASH_COMP_DIR}/shell-switch"
+cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${ZSH_COMP_DIR}/_shell-switch"
+cp -f "${SCRIPT_DIR}/completions/shell-switch.fish" "${FISH_COMP_DIR}/shell-switch.fish"
+
+if [[ -d "${HOME}/.zfunc" ]]; then
+    cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${HOME}/.zfunc/_shell-switch"
+fi
+
+# 6. Populate example profiles if profiles directory is empty
 if [[ ! -f "${PROFILES_DIR}/current" ]]; then
     if [[ -d "${SCRIPT_DIR}/example-profiles" ]]; then
         cp -rn "${SCRIPT_DIR}/example-profiles/"* "${PROFILES_DIR}/" 2>/dev/null || true

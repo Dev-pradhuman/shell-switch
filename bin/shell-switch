@@ -142,8 +142,52 @@ cmd_switch() {
             local dest_path="${HOME}/.config/${cfg_name}"
 
             if [[ -e "${src_path}" ]]; then
+                # Safety check: if destination is a real directory (not a symlink), preserve it in 'original' profile
+                if [[ -d "${dest_path}" && ! -L "${dest_path}" ]]; then
+                    local backup_dir="${PROFILES_DIR}/original/${cfg_name}"
+                    printf "  ${YELLOW}Preserving existing real ~/.config/%s into %s${RESET}\n" "${cfg_name}" "${backup_dir}"
+                    mkdir -p "${PROFILES_DIR}/original"
+                    cp -a "${dest_path}" "${backup_dir}"
+                    rm -rf "${dest_path}"
+
+                    if [[ ! -f "${PROFILES_DIR}/original/profile.sh" ]]; then
+                        cat << 'BAKEOF' > "${PROFILES_DIR}/original/profile.sh"
+#!/usr/bin/env bash
+NAME="Original Setup"
+DESCRIPTION="Automatic backup of your pre-existing desktop configuration"
+ICON="user-home"
+
+declare -A CONFIG_MAP=(
+    ["hypr"]="$PROFILE_DIR/hypr"
+    ["waybar"]="$PROFILE_DIR/waybar"
+    ["quickshell"]="$PROFILE_DIR/quickshell"
+)
+
+start_shell() {
+    pkill -x qs 2>/dev/null || true
+    pkill -f "qs -c caelestia" 2>/dev/null || true
+    pkill -x waybar 2>/dev/null || true
+    sleep 0.3
+    if [[ -f "$PROFILE_DIR/waybar/config" ]] && command -v waybar >/dev/null 2>&1; then
+        setsid waybar >/dev/null 2>&1 &
+    elif [[ -d "$PROFILE_DIR/quickshell" ]] && command -v qs >/dev/null 2>&1; then
+        setsid qs >/dev/null 2>&1 &
+    fi
+}
+
+stop_shell() {
+    pkill -x waybar 2>/dev/null || true
+    pkill -x qs 2>/dev/null || true
+    pkill -f "qs -c caelestia" 2>/dev/null || true
+}
+BAKEOF
+                        chmod +x "${PROFILES_DIR}/original/profile.sh"
+                    fi
+                else
+                    rm -rf "${dest_path}"
+                fi
+
                 printf "  Linking ~/.config/%s -> %s\n" "${cfg_name}" "${src_path}"
-                rm -rf "${dest_path}"
                 ln -sfn "${src_path}" "${dest_path}"
             else
                 printf "${YELLOW}  Warning: Config path '%s' does not exist, skipping ~/.config/%s${RESET}\n" "${src_path}" "${cfg_name}"
@@ -375,17 +419,192 @@ EOF
     printf "Switch to it anytime with: ${BOLD}shell-switch %s${RESET}\n" "${name}"
 }
 
+cmd_backup() {
+    local name="${1:-backup-$(date +%Y%m%d-%H%M%S)}"
+    local pdir="${PROFILES_DIR}/${name}"
+
+    if [[ -d "${pdir}" ]]; then
+        printf "${RED}Error:${RESET} Profile '%s' already exists.\n" "${name}"
+        exit 1
+    fi
+
+    printf "${CYAN}→ Snapshotting active desktop configs into profile '%s'...${RESET}\n" "${name}"
+    mkdir -p "${pdir}"
+
+    local configs_copied=()
+    for cfg in hypr waybar quickshell swaync rofi fuzzel dms; do
+        if [[ -d "${HOME}/.config/${cfg}" ]]; then
+            cp -aL "${HOME}/.config/${cfg}" "${pdir}/${cfg}" 2>/dev/null || cp -a "${HOME}/.config/${cfg}" "${pdir}/${cfg}" 2>/dev/null || true
+            configs_copied+=("${cfg}")
+        fi
+    done
+
+    cat << EOF > "${pdir}/profile.sh"
+#!/usr/bin/env bash
+NAME="${name}"
+DESCRIPTION="Snapshot created on $(date '+%Y-%m-%d %H:%M:%S')"
+ICON="document-save"
+
+declare -A CONFIG_MAP=(
+EOF
+
+    for cfg in "${configs_copied[@]}"; do
+        echo "    [\"${cfg}\"]=\"\${PROFILE_DIR}/${cfg}\"" >> "${pdir}/profile.sh"
+    done
+
+    cat << 'EOF' >> "${pdir}/profile.sh"
+)
+
+start_shell() {
+    pkill -x qs 2>/dev/null || true
+    pkill -f "qs -c caelestia" 2>/dev/null || true
+    pkill -x waybar 2>/dev/null || true
+    pkill -x swaync 2>/dev/null || true
+    sleep 0.3
+    if [[ -d "${CONFIG_MAP[quickshell]:-}" ]] && command -v qs >/dev/null 2>&1; then
+        setsid qs >/dev/null 2>&1 &
+    elif [[ -f "${CONFIG_MAP[waybar]:-}/config" ]] && command -v waybar >/dev/null 2>&1; then
+        setsid waybar >/dev/null 2>&1 &
+    fi
+}
+
+stop_shell() {
+    pkill -x waybar 2>/dev/null || true
+    pkill -x qs 2>/dev/null || true
+    pkill -x swaync 2>/dev/null || true
+}
+EOF
+    chmod +x "${pdir}/profile.sh"
+    printf "${GREEN}✔ Created snapshot profile at %s${RESET}\n" "${pdir}"
+    printf "Switch to it anytime with: ${BOLD}shell-switch %s${RESET}\n" "${name}"
+}
+
+cmd_get() {
+    local rice="${1:-}"
+
+    declare -A CATALOG_URLS=(
+        ["hyde"]="https://github.com/HyDE-Project/HyDE"
+        ["dms"]="https://github.com/AvengeMedia/DankMaterialShell"
+        ["end4"]="https://github.com/end-4/dots-hyprland"
+        ["ml4w"]="https://github.com/mylinuxforwork/dotfiles"
+        ["44dots"]="https://github.com/44kash/dotfiles"
+        ["caelestia"]="https://github.com/caelestia-dots/caelestia"
+    )
+
+    declare -A CATALOG_NAMES=(
+        ["hyde"]="HyDE Rice"
+        ["dms"]="DankMaterialShell"
+        ["end4"]="end-4 Dots (illogical-impulse)"
+        ["ml4w"]="ML4W Dotfiles"
+        ["44dots"]="44 Dots"
+        ["caelestia"]="Caelestia Shell"
+    )
+
+    declare -A CATALOG_DESC=(
+        ["hyde"]="Modular HyDE Hyprland rice with Waybar, dynamic themes, Rofi & SwayNC"
+        ["dms"]="Material 3 Quickshell desktop shell with dynamic theming & dock"
+        ["end4"]="Material You desktop rice with Quickshell 'ii' suite, Matugen & Fuzzel"
+        ["ml4w"]="MyLinuxForWork modular Hyprland desktop with Waybar themes & Rofi"
+        ["44dots"]="Clean Arch Linux & Hyprland rice with Waybar, SwayNC & Rofi"
+        ["caelestia"]="Quickshell desktop shell with dynamic colors, drawers & widgets"
+    )
+
+    if [[ -z "${rice}" ]]; then
+        printf "\n${BOLD}Popular Desktop Shells & Rice Catalog:${RESET}\n\n"
+        printf "  %-12s %-25s %s\n" "ID" "NAME" "STATUS"
+        printf "  %-12s %-25s %s\n" "──" "────" "──────"
+
+        for id in "caelestia" "hyde" "dms" "end4" "ml4w" "44dots"; do
+            local status="${MUTED}[Available]${RESET}"
+            if [[ -d "${PROFILES_DIR}/${id}" ]]; then
+                if [[ "$(get_current)" == "${id}" ]]; then
+                    status="${GREEN}[Active]${RESET}"
+                else
+                    status="${CYAN}[Installed]${RESET}"
+                fi
+            fi
+            printf "  ${BOLD}%-12s${RESET} %-25s %b\n" "${id}" "${CATALOG_NAMES[${id}]}" "${status}"
+            printf "               ${MUTED}%s${RESET}\n" "${CATALOG_DESC[${id}]}"
+            printf "               ${MUTED}Repo: %s${RESET}\n\n" "${CATALOG_URLS[${id}]}"
+        done
+
+        printf "Install any rice setup with: ${GREEN}shell-switch get <id>${RESET}\n\n"
+        return 0
+    fi
+
+    if [[ -z "${CATALOG_URLS[${rice}]:-}" ]]; then
+        printf "${RED}Error:${RESET} Unknown rice '%s'. Run ${BOLD}shell-switch get${RESET} to view catalog.\n" "${rice}"
+        exit 1
+    fi
+
+    local pdir="${PROFILES_DIR}/${rice}"
+    if [[ -d "${pdir}" ]]; then
+        printf "${YELLOW}Notice:${RESET} Profile '%s' is already installed at %s\n" "${rice}" "${pdir}"
+        printf "Switch to it with: ${BOLD}shell-switch %s${RESET}\n" "${rice}"
+        return 0
+    fi
+
+    local url="${CATALOG_URLS[${rice}]}"
+    printf "${CYAN}→ Installing %s (%s)...${RESET}\n" "${CATALOG_NAMES[${rice}]}" "${url}"
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || echo "")"
+    local packaged_profile="${script_dir}/example-profiles/${rice}/profile.sh"
+
+    mkdir -p "${pdir}"
+    printf "  Cloning repository (shallow)...\n"
+    git clone --depth 1 "${url}" "${pdir}/repo"
+
+    if [[ -f "${packaged_profile}" ]]; then
+        cp -f "${packaged_profile}" "${pdir}/profile.sh"
+    elif [[ -f "${HOME}/.config/desktop-shells/${rice}/profile.sh" ]]; then
+        cp -f "${HOME}/.config/desktop-shells/${rice}/profile.sh" "${pdir}/profile.sh"
+    else
+        cmd_clone "${url}" "${rice}"
+    fi
+
+    chmod +x "${pdir}/profile.sh"
+    printf "${GREEN}✔ Successfully installed %s!${RESET}\n" "${CATALOG_NAMES[${rice}]}"
+    printf "\nTo switch to this rice now, run:\n"
+    printf "  ${BOLD}${GREEN}shell-switch %s${RESET}\n\n" "${rice}"
+}
+
+cmd_remove() {
+    local target="${1:-}"
+    if [[ -z "${target}" ]]; then
+        printf "${RED}Error:${RESET} Please specify a profile name to remove.\n"
+        printf "Usage: ${BOLD}shell-switch remove <name>${RESET}\n"
+        exit 1
+    fi
+
+    if [[ "${target}" == "$(get_current)" ]]; then
+        printf "${RED}Error:${RESET} Cannot remove currently active profile '%s'. Switch to another profile first.\n" "${target}"
+        exit 1
+    fi
+
+    local pdir="${PROFILES_DIR}/${target}"
+    if [[ ! -d "${pdir}" ]]; then
+        printf "${RED}Error:${RESET} Profile '%s' not found.\n" "${target}"
+        exit 1
+    fi
+
+    rm -rf "${pdir}"
+    printf "${GREEN}✔ Removed profile '%s'.${RESET}\n" "${target}"
+}
+
 cmd_help() {
     printf "\n${BOLD}Desktop Shell Switcher (${CYAN}shell-switch${RESET}${BOLD})${RESET}\n"
     printf "Instantly switch between Caelestia, 43PR, 44 Dots, and other desktop rices.\n\n"
     printf "Usage:\n"
-    printf "  ${GREEN}shell-switch${RESET}                     Open interactive GUI switcher (Rofi/Fuzzel)\n"
+    printf "  ${GREEN}shell-switch${RESET}                     Open interactive GUI switcher (Libadwaita/Rofi)\n"
     printf "  ${GREEN}shell-switch <name>${RESET}              Switch immediately to a shell profile\n"
     printf "  ${GREEN}shell-switch list${RESET} (or ${GREEN}ls${RESET})        List all available shell profiles\n"
     printf "  ${GREEN}shell-switch current${RESET}             Show the currently active shell\n"
-    printf "  ${GREEN}shell-switch gui${RESET}                 Open GUI selection modal\n"
+    printf "  ${GREEN}shell-switch get [rice_id]${RESET}       Explore or 1-click install popular rices\n"
+    printf "  ${GREEN}shell-switch backup [name]${RESET}       Snapshot active desktop configuration\n"
     printf "  ${GREEN}shell-switch clone <url> [name]${RESET}  Clone a GitHub dotfiles repo as a shell\n"
     printf "  ${GREEN}shell-switch add <name>${RESET}          Create a new shell profile template\n"
+    printf "  ${GREEN}shell-switch remove <name>${RESET}       Remove an installed shell profile\n"
     printf "  ${GREEN}shell-switch help${RESET}                Show this help message\n\n"
 }
 
@@ -412,8 +631,17 @@ case "${ACTION}" in
     current)
         cmd_current
         ;;
+    get)
+        cmd_get "${2:-}"
+        ;;
+    backup)
+        cmd_backup "${2:-}"
+        ;;
     add)
         cmd_add "${2:-}"
+        ;;
+    remove|rm|delete)
+        cmd_remove "${2:-}"
         ;;
     clone)
         cmd_clone "${2:-}" "${3:-}"

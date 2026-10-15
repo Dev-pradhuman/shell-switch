@@ -1,0 +1,69 @@
+name: ⚡ Bug Report (24h Response SLA)
+description: Report an issue, crash, or broken rice switch. We commit to triage and fix within 24 hours.
+title: "[Bug]: "
+labels: ["bug", "sla-24h"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ⚡ 24-Hour Bug Fix SLA
+        Thank you for reporting! We actively maintain **shell-switch** and guarantee maintainer triage and a fix or workaround within **24 hours**.
+
+  - type: input
+    id: rice_profile
+    attributes:
+      label: Rice Profile
+      description: Which rice profile was active or being switched to? (e.g., `caelestia`, `hyde`, `44dots`, `dms`, custom profile)
+      placeholder: "e.g. caelestia"
+    validations:
+      required: true
+
+  - type: input
+    id: distro_env
+    attributes:
+      label: Linux Distribution & Compositor
+      description: Your OS and Hyprland / compositor version
+      placeholder: "Arch Linux, Hyprland 0.47.0, waybar 0.11.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what went wrong.
+      placeholder: "When running 'shell-switch hyde', Waybar does not spawn and the old bar disappears..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce the problem?
+      placeholder: |
+        1. Run 'shell-switch caelestia'
+        2. Run 'shell-switch hyde'
+        3. See error in terminal or observe missing bar
+    validations:
+      required: true
+
+  - type: textarea
+    id: terminal_output
+    attributes:
+      label: Terminal Output & Logs
+      description: Paste output from running `shell-switch <name> --force` or any error messages
+      render: shell
+      placeholder: |
+        $ shell-switch hyde --force
+        [paste terminal output here]
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification
+      options:
+        - label: I verified that the required tools (e.g., Python Libadwaita or the rice's bar daemon) are installed.
+          required: true
+        - label: I searched existing open and closed issues and this is not a duplicate.
+          required: true

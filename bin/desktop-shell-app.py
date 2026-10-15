@@ -2,6 +2,7 @@
 """
 Desktop Shell & Rice Switcher GUI
 A modern, native Libadwaita / GTK4 application for managing and switching Hyprland desktop shells.
+Features live search, 1-click rice explore store, active bar indicators, and keyboard navigation.
 """
 
 import os
@@ -18,7 +19,10 @@ from gi.repository import Gtk, Gdk, Adw, GLib, Gio, Pango
 
 PROFILES_DIR = Path.home() / ".config" / "desktop-shells"
 CURRENT_FILE = PROFILES_DIR / "current"
-SWITCHER_BIN = Path.home() / ".local" / "bin" / "shell-switch"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+SWITCHER_BIN = PROJECT_DIR / "bin" / "shell-switch"
+if not SWITCHER_BIN.exists():
+    SWITCHER_BIN = Path.home() / ".local" / "bin" / "shell-switch"
 
 CUSTOM_CSS = """
 .rice-card {
@@ -49,11 +53,29 @@ CUSTOM_CSS = """
     border-radius: 9999px;
 }
 
+.badge-installed {
+    background-color: alpha(@accent_color, 0.2);
+    color: @accent_color;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+}
+
 .tag-chip {
     background-color: alpha(@theme_fg_color, 0.08);
     color: alpha(@theme_fg_color, 0.85);
     font-size: 11px;
     font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+
+.tag-bar {
+    background-color: alpha(@accent_color, 0.15);
+    color: @accent_color;
+    font-size: 11px;
+    font-weight: 700;
     padding: 3px 10px;
     border-radius: 6px;
 }
@@ -71,7 +93,74 @@ CUSTOM_CSS = """
 .preview-image {
     border-radius: 12px;
 }
+
+.search-bar-box {
+    margin-bottom: 12px;
+}
 """
+
+RICE_CATALOG = [
+    {
+        "id": "caelestia",
+        "name": "Caelestia Shell",
+        "desc": "Quickshell desktop shell with dynamic Material You colors, drawers, widgets & animations",
+        "repo": "https://github.com/caelestia-dots/caelestia",
+        "bar": "Quickshell",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Quickshell", "Dynamic Theme", "Drawers", "Hyprland"],
+        "preview": "assets/preview-44dots.png",
+    },
+    {
+        "id": "hyde",
+        "name": "HyDE Rice",
+        "desc": "Modular HyDE Project Hyprland rice with Waybar, dynamic themes, Rofi, SwayNC & Dunst",
+        "repo": "https://github.com/HyDE-Project/HyDE",
+        "bar": "Waybar",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Waybar", "Rofi", "SwayNC", "Hyprland"],
+        "preview": "assets/preview-hyde.png",
+    },
+    {
+        "id": "dms",
+        "name": "DankMaterialShell",
+        "desc": "Material 3 desktop shell built on Quickshell with dynamic theming, bottom dock & widgets",
+        "repo": "https://github.com/AvengeMedia/DankMaterialShell",
+        "bar": "Quickshell",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Quickshell", "Material 3", "Desktop Dock", "Hyprland"],
+        "preview": None,
+    },
+    {
+        "id": "end4",
+        "name": "end-4 Dots",
+        "desc": "Material You desktop rice with Quickshell 'ii' suite, Matugen dynamic colors & Fuzzel launcher",
+        "repo": "https://github.com/end-4/dots-hyprland",
+        "bar": "Quickshell (ii)",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Quickshell (ii)", "Material You", "Matugen", "Hyprland"],
+        "preview": None,
+    },
+    {
+        "id": "ml4w",
+        "name": "ML4W Dotfiles",
+        "desc": "MyLinuxForWork modular Hyprland desktop with Waybar themes, settings app & Rofi",
+        "repo": "https://github.com/mylinuxforwork/dotfiles",
+        "bar": "Waybar",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Waybar", "Rofi", "Settings App", "Hyprland"],
+        "preview": "assets/preview-ml4w.png",
+    },
+    {
+        "id": "44dots",
+        "name": "44 Dots",
+        "desc": "sr-44 clean Arch Linux & Hyprland rice with custom Waybar styles, SwayNC & Rofi",
+        "repo": "https://github.com/44kash/dotfiles",
+        "bar": "Waybar",
+        "icon": "view-app-grid",
+        "tags": ["Waybar", "SwayNC", "Rofi", "Hyprland"],
+        "preview": "assets/preview-44dots.png",
+    },
+]
 
 
 def load_profile_meta(profile_dir: Path):
@@ -84,6 +173,7 @@ def load_profile_meta(profile_dir: Path):
         "icon": "preferences-desktop-theme",
         "configs": [],
         "preview": None,
+        "bar": None,
     }
 
     if not profile_sh.exists():
@@ -122,10 +212,19 @@ def load_profile_meta(profile_dir: Path):
     except Exception as e:
         print(f"Error parsing {profile_sh}: {e}", file=sys.stderr)
 
+    # Determine bar daemon
+    if "quickshell" in meta["configs"] or (profile_dir / "quickshell").exists() or (profile_dir / "repo" / "quickshell").exists():
+        meta["bar"] = "Quickshell"
+    elif "waybar" in meta["configs"] or (profile_dir / "waybar").exists() or (profile_dir / "repo" / "waybar").exists():
+        meta["bar"] = "Waybar"
+    elif "dms" in meta["configs"]:
+        meta["bar"] = "Quickshell"
+
     # Check for preview image
     for img_candidate in [
         profile_dir / "preview.png",
         profile_dir / "preview.jpg",
+        PROJECT_DIR / f"assets/preview-{profile_dir.name}.png",
         profile_dir / "repo" / "screenshots" / "hyprland-3.png",
         profile_dir / "repo" / "screenshots" / "hypland.png",
     ]:
@@ -151,99 +250,121 @@ class AddShellDialog(Adw.Window):
         content.set_margin_start(24)
         content.set_margin_end(24)
 
-        header = Gtk.Label(
-            label="Import Dotfiles or Create a New Rice",
-            css_classes=["title-3"],
-            xalign=0,
-        )
-        content.append(header)
+        header = Adw.HeaderBar()
+        self.set_title("Add Shell Profile")
 
-        desc = Gtk.Label(
-            label="Clone any Hyprland or Wayland dotfiles repository directly from GitHub, or initialize an empty template.",
-            css_classes=["card-desc"],
-            wrap=True,
-            xalign=0,
-        )
-        content.append(desc)
+        # Tab Switcher: Clone Git vs Blank Template
+        stack = Adw.ViewStack()
 
-        # Form Group
-        pref_group = Adw.PreferencesGroup()
+        # Page 1: Git Clone
+        page_git = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page_git.set_margin_top(12)
 
-        # URL Entry
-        self.url_row = Adw.EntryRow(title="GitHub / Git URL")
-        self.url_row.set_text("https://github.com/")
-        pref_group.add(self.url_row)
+        git_group = Adw.PreferencesGroup(title="Clone from GitHub Repository")
+        self.url_entry = Adw.EntryRow(title="Git URL (HTTPS)")
+        self.url_entry.set_text("https://github.com/")
+        git_group.add(self.url_entry)
 
-        # Name Entry
-        self.name_row = Adw.EntryRow(title="Profile Name (Optional)")
-        pref_group.add(self.name_row)
+        self.name_entry = Adw.EntryRow(title="Profile Name (Optional)")
+        git_group.add(self.name_entry)
+        page_git.append(git_group)
 
-        content.append(pref_group)
-
-        # Status & Spinner
-        self.status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        self.status_box.set_halign(Gtk.Align.CENTER)
-        self.spinner = Gtk.Spinner()
-        self.status_label = Gtk.Label(label="", css_classes=["card-desc"])
-        self.status_box.append(self.spinner)
-        self.status_box.append(self.status_label)
-        content.append(self.status_box)
-
-        # Buttons
-        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        btn_box.set_halign(Gtk.Align.END)
-
-        cancel_btn = Gtk.Button(label="Cancel")
-        cancel_btn.connect("clicked", lambda b: self.close())
-        btn_box.append(cancel_btn)
-
-        self.clone_btn = Gtk.Button(label="Clone & Add Shell", css_classes=["suggested-action", "pill"])
+        self.clone_btn = Gtk.Button(label="Clone and Create Profile", css_classes=["suggested-action", "pill"])
         self.clone_btn.connect("clicked", self.on_clone_clicked)
-        btn_box.append(self.clone_btn)
+        page_git.append(self.clone_btn)
 
-        content.append(btn_box)
-        self.set_content(content)
+        # Page 2: Blank Template
+        page_blank = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page_blank.set_margin_top(12)
+
+        blank_group = Adw.PreferencesGroup(title="Create Blank Shell Profile")
+        self.blank_name = Adw.EntryRow(title="New Profile Identifier")
+        self.blank_name.set_text("my-custom-rice")
+        blank_group.add(self.blank_name)
+        page_blank.append(blank_group)
+
+        self.blank_btn = Gtk.Button(label="Generate Template", css_classes=["suggested-action", "pill"])
+        self.blank_btn.connect("clicked", self.on_blank_clicked)
+        page_blank.append(self.blank_btn)
+
+        stack.add_titled(page_git, "git", "Clone from Git")
+        stack.add_titled(page_blank, "blank", "New Template")
+
+        view_switcher = Adw.ViewSwitcher(stack=stack, policy=Adw.ViewSwitcherPolicy.WIDE)
+
+        content.append(view_switcher)
+        content.append(stack)
+
+        # Status spinner
+        self.spinner = Gtk.Spinner()
+        self.status_lbl = Gtk.Label(label="", css_classes=["card-desc"])
+        status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        status_box.append(self.spinner)
+        status_box.append(self.status_lbl)
+        content.append(status_box)
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        main_box.append(header)
+        main_box.append(content)
+        self.set_content(main_box)
 
     def on_clone_clicked(self, btn):
-        url = self.url_row.get_text().strip()
-        name = self.name_row.get_text().strip()
+        url = self.url_entry.get_text().strip()
+        custom_name = self.name_entry.get_text().strip()
 
         if not url or url == "https://github.com/":
-            self.status_label.set_text("Please enter a valid Git URL.")
+            self.status_lbl.set_text("Please enter a valid Git URL.")
             return
 
-        self.clone_btn.set_sensitive(False)
         self.spinner.start()
-        self.status_label.set_text("Cloning repository in background...")
+        self.clone_btn.set_sensitive(False)
+        self.status_lbl.set_text(f"Cloning {url}...")
 
-        def run_clone():
+        def worker():
             cmd = [str(SWITCHER_BIN), "clone", url]
-            if name:
-                cmd.append(name)
+            if custom_name:
+                cmd.append(custom_name)
             res = subprocess.run(cmd, capture_output=True, text=True)
 
             def done():
                 self.spinner.stop()
+                self.clone_btn.set_sensitive(True)
                 if res.returncode == 0:
                     self.on_added_callback()
                     self.close()
                 else:
-                    self.clone_btn.set_sensitive(True)
-                    err_msg = res.stderr or res.stdout or "Failed to clone repository."
-                    self.status_label.set_text(f"Error: {err_msg[:60]}")
+                    self.status_lbl.set_text(f"Error: {res.stderr or 'Clone failed'}")
 
             GLib.idle_add(done)
 
-        threading.Thread(target=run_clone, daemon=True).start()
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_blank_clicked(self, btn):
+        name = self.blank_name.get_text().strip()
+        if not name:
+            self.status_lbl.set_text("Please specify a name.")
+            return
+
+        res = subprocess.run([str(SWITCHER_BIN), "add", name], capture_output=True, text=True)
+        if res.returncode == 0:
+            self.on_added_callback()
+            self.close()
+        else:
+            self.status_lbl.set_text(f"Error: {res.stderr or 'Failed to create'}")
 
 
 class ShellSwitcherWindow(Adw.ApplicationWindow):
-    """Main Application Window."""
+    """Main Application Window with Tabbed View and Live Search."""
 
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("Desktop Shell Switcher")
-        self.set_default_size(840, 750)
+        self.set_default_size(860, 780)
+
+        # Keyboard Navigation controller
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self.on_key_pressed)
+        self.add_controller(key_controller)
 
         # Toast overlay for notifications
         self.toast_overlay = Adw.ToastOverlay()
@@ -253,60 +374,132 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
 
         # Header Bar
         header = Adw.HeaderBar()
-        self.title_widget = Adw.WindowTitle(
-            title="Desktop Shell Switcher",
-            subtitle=f"Active: {self.get_current_shell()}",
-        )
-        header.set_title_widget(self.title_widget)
+
+        # View Stack & Switcher Title (Installed vs Explore)
+        self.view_stack = Adw.ViewStack()
+
+        self.switcher_title = Adw.ViewSwitcherTitle()
+        self.switcher_title.set_stack(self.view_stack)
+        self.switcher_title.set_title("Desktop Shell Switcher")
+        self.switcher_title.set_subtitle(f"Active: {self.get_current_shell()}")
+        header.set_title_widget(self.switcher_title)
 
         # Add / Clone Button
         add_btn = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add / Clone New Shell")
         add_btn.connect("clicked", self.on_add_clicked)
         header.pack_start(add_btn)
 
+        # Snapshot / Backup Button
+        backup_btn = Gtk.Button(icon_name="document-save-symbolic", tooltip_text="Snapshot Active Desktop Config (Backup)")
+        backup_btn.connect("clicked", self.on_backup_clicked)
+        header.pack_start(backup_btn)
+
         # Refresh Button
-        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Refresh List")
-        refresh_btn.connect("clicked", lambda b: self.refresh_profiles())
+        refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Refresh List (Ctrl+R)")
+        refresh_btn.connect("clicked", lambda b: self.refresh_all())
         header.pack_end(refresh_btn)
 
         main_box.append(header)
 
-        # Scrolled content area
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_vexpand(True)
-        scrolled.set_hexpand(True)
+        # =====================================================================
+        # Page 1: Installed Profiles
+        # =====================================================================
+        installed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        installed_scrolled = Gtk.ScrolledWindow()
+        installed_scrolled.set_vexpand(True)
+        installed_scrolled.set_hexpand(True)
 
-        clamp = Adw.Clamp()
-        clamp.set_maximum_size(800)
-        clamp.set_tightening_threshold(600)
-        clamp.set_margin_top(20)
-        clamp.set_margin_bottom(24)
-        clamp.set_margin_start(20)
-        clamp.set_margin_end(20)
+        installed_clamp = Adw.Clamp()
+        installed_clamp.set_maximum_size(820)
+        installed_clamp.set_tightening_threshold(600)
+        installed_clamp.set_margin_top(16)
+        installed_clamp.set_margin_bottom(24)
+        installed_clamp.set_margin_start(20)
+        installed_clamp.set_margin_end(20)
 
+        installed_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+
+        # Live Search Entry
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.set_placeholder_text("Search installed desktop shells (Ctrl+F)...")
+        self.search_entry.connect("search-changed", self.on_search_changed)
+        installed_container.append(self.search_entry)
+
+        # Cards Box
         self.cards_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
-        clamp.set_child(self.cards_box)
-        scrolled.set_child(clamp)
+        installed_container.append(self.cards_box)
 
-        main_box.append(scrolled)
+        installed_clamp.set_child(installed_container)
+        installed_scrolled.set_child(installed_clamp)
+        installed_box.append(installed_scrolled)
+
+        page_installed = self.view_stack.add_titled(installed_box, "installed", "Installed")
+        page_installed.set_icon_name("view-app-grid-symbolic")
+
+        # =====================================================================
+        # Page 2: Explore Rice Catalog
+        # =====================================================================
+        explore_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        explore_scrolled = Gtk.ScrolledWindow()
+        explore_scrolled.set_vexpand(True)
+        explore_scrolled.set_hexpand(True)
+
+        explore_clamp = Adw.Clamp()
+        explore_clamp.set_maximum_size(820)
+        explore_clamp.set_tightening_threshold(600)
+        explore_clamp.set_margin_top(16)
+        explore_clamp.set_margin_bottom(24)
+        explore_clamp.set_margin_start(20)
+        explore_clamp.set_margin_end(20)
+
+        self.explore_cards_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        explore_clamp.set_child(self.explore_cards_box)
+        explore_scrolled.set_child(explore_clamp)
+        explore_box.append(explore_scrolled)
+
+        page_explore = self.view_stack.add_titled(explore_box, "explore", "Explore Rices")
+        page_explore.set_icon_name("starred-symbolic")
+
+        main_box.append(self.view_stack)
         self.toast_overlay.set_child(main_box)
         self.set_content(self.toast_overlay)
 
-        # Load shell profiles
-        self.refresh_profiles()
+        # State tracking
+        self.all_profile_cards = []
+
+        # Load shell profiles & catalog
+        self.refresh_all()
+
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        elif keyval == Gdk.KEY_f and (state & Gdk.ModifierType.CONTROL_MASK):
+            self.view_stack.set_visible_child_name("installed")
+            self.search_entry.grab_focus()
+            return True
+        elif keyval == Gdk.KEY_r and (state & Gdk.ModifierType.CONTROL_MASK):
+            self.refresh_all()
+            return True
+        return False
 
     def get_current_shell(self):
         if CURRENT_FILE.exists():
             return CURRENT_FILE.read_text().strip()
         return "caelestia"
 
+    def refresh_all(self):
+        self.refresh_profiles()
+        self.refresh_explore()
+
     def refresh_profiles(self):
-        # Clear existing cards
         while child := self.cards_box.get_first_child():
             self.cards_box.remove(child)
 
+        self.all_profile_cards.clear()
+
         current = self.get_current_shell()
-        self.title_widget.set_subtitle(f"Active: {current}")
+        self.switcher_title.set_subtitle(f"Active: {current}")
 
         PROFILES_DIR.mkdir(parents=True, exist_ok=True)
         profiles = []
@@ -329,7 +522,25 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
 
         for meta in profiles:
             card = self.create_profile_card(meta, is_active=(meta["id"] == current))
+            self.all_profile_cards.append({
+                "widget": card,
+                "meta": meta,
+                "search_text": f"{meta['id']} {meta['name']} {meta['description']} {' '.join(meta.get('configs', []))}".lower(),
+            })
             self.cards_box.append(card)
+
+        # Apply current search filter
+        self.on_search_changed(self.search_entry)
+
+    def on_search_changed(self, entry):
+        query = entry.get_text().strip().lower()
+        visible_count = 0
+
+        for item in self.all_profile_cards:
+            matches = not query or (query in item["search_text"])
+            item["widget"].set_visible(matches)
+            if matches:
+                visible_count += 1
 
     def create_profile_card(self, meta, is_active: bool):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -363,7 +574,6 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         title_box.append(id_lbl)
         top_row.append(title_box)
 
-        # Push action to right
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         top_row.append(spacer)
@@ -389,8 +599,13 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         # Tags & Actions Row
         bottom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        # Tags
-        tags = meta.get("configs", [])
+        # Bar Daemon Tag (Quickshell vs Waybar)
+        if meta.get("bar"):
+            bar_chip = Gtk.Label(label=f"󰍹 {meta['bar']}", css_classes=["tag-bar"])
+            bottom_row.append(bar_chip)
+
+        # Config tags
+        tags = list(meta.get("configs", []))
         if "hypr" not in tags and (PROFILES_DIR / meta["id"] / "hypr").exists():
             tags.append("hypr")
 
@@ -400,6 +615,7 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
             "waybar": "󰍹 Waybar",
             "swaync": "󰂚 Swaync",
             "rofi": "󰀻 Rofi",
+            "fuzzel": "󰀻 Fuzzel",
         }
 
         for t in tags:
@@ -426,6 +642,144 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         card.append(bottom_row)
         return card
 
+    def refresh_explore(self):
+        while child := self.explore_cards_box.get_first_child():
+            self.explore_cards_box.remove(child)
+
+        header_lbl = Gtk.Label(
+            label="Explore Popular Hyprland Desktop Rices",
+            css_classes=["title-2"],
+            xalign=0,
+        )
+        sub_lbl = Gtk.Label(
+            label="1-Click install curated dotfiles adapters directly into your switcher.",
+            css_classes=["card-desc"],
+            xalign=0,
+        )
+        self.explore_cards_box.append(header_lbl)
+        self.explore_cards_box.append(sub_lbl)
+
+        current = self.get_current_shell()
+
+        for rice in RICE_CATALOG:
+            card = self.create_explore_card(rice, current)
+            self.explore_cards_box.append(card)
+
+    def create_explore_card(self, rice, current: str):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        card.set_css_classes(["rice-card"])
+
+        rice_id = rice["id"]
+        is_installed = (PROFILES_DIR / rice_id).exists()
+        is_active = (rice_id == current)
+
+        # Preview Banner
+        preview_path = PROJECT_DIR / f"assets/preview-{rice_id}.png"
+        if not preview_path.exists() and (PROFILES_DIR / rice_id / "preview.png").exists():
+            preview_path = PROFILES_DIR / rice_id / "preview.png"
+
+        if preview_path.exists():
+            try:
+                picture = Gtk.Picture.new_for_filename(str(preview_path))
+                picture.set_content_fit(Gtk.ContentFit.COVER)
+                picture.set_size_request(-1, 150)
+                picture.set_css_classes(["preview-image"])
+                card.append(picture)
+            except Exception as e:
+                print(f"Error loading preview: {e}")
+
+        # Top row
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        icon_img = Gtk.Image.new_from_icon_name(rice["icon"])
+        icon_img.set_pixel_size(36)
+        top_row.append(icon_img)
+
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title_lbl = Gtk.Label(label=rice["name"], css_classes=["card-title"], xalign=0)
+        repo_lbl = Gtk.LinkButton(label=rice["repo"], uri=rice["repo"])
+        repo_lbl.set_halign(Gtk.Align.START)
+        title_box.append(title_lbl)
+        title_box.append(repo_lbl)
+        top_row.append(title_box)
+
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        top_row.append(spacer)
+
+        if is_active:
+            top_row.append(Gtk.Label(label="● Active", css_classes=["badge-active"]))
+        elif is_installed:
+            top_row.append(Gtk.Label(label="✔ Installed", css_classes=["badge-installed"]))
+            switch_btn = Gtk.Button(label="Switch", css_classes=["suggested-action", "pill"])
+            switch_btn.connect("clicked", lambda b, mid=rice_id: self.on_switch_clicked(mid))
+            top_row.append(switch_btn)
+        else:
+            get_btn = Gtk.Button(label="Get Rice", css_classes=["suggested-action", "pill"])
+            get_btn.connect("clicked", lambda b, mid=rice_id, btn=get_btn: self.on_install_rice(mid, btn))
+            top_row.append(get_btn)
+
+        card.append(top_row)
+
+        desc_lbl = Gtk.Label(label=rice["desc"], css_classes=["card-desc"], wrap=True, xalign=0)
+        card.append(desc_lbl)
+
+        # Tags row
+        bottom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar_chip = Gtk.Label(label=f"󰍹 {rice['bar']}", css_classes=["tag-bar"])
+        bottom_row.append(bar_chip)
+
+        for t in rice.get("tags", []):
+            chip = Gtk.Label(label=t, css_classes=["tag-chip"])
+            bottom_row.append(chip)
+
+        card.append(bottom_row)
+        return card
+
+    def on_install_rice(self, rice_id: str, button: Gtk.Button):
+        button.set_sensitive(False)
+        button.set_label("Installing...")
+
+        toast = Adw.Toast.new(f"Downloading and configuring '{rice_id}'...")
+        toast.set_timeout(5)
+        self.toast_overlay.add_toast(toast)
+
+        def worker():
+            cmd = [str(SWITCHER_BIN), "get", rice_id]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+
+            def update_ui():
+                if res.returncode == 0:
+                    success_toast = Adw.Toast.new(f"Successfully installed '{rice_id}'!")
+                    success_toast.set_timeout(4)
+                    self.toast_overlay.add_toast(success_toast)
+                else:
+                    err_toast = Adw.Toast.new(f"Install failed: {res.stderr or 'Error'}")
+                    self.toast_overlay.add_toast(err_toast)
+                self.refresh_all()
+
+            GLib.idle_add(update_ui)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_backup_clicked(self, btn):
+        toast = Adw.Toast.new("Creating desktop configuration snapshot...")
+        toast.set_timeout(2)
+        self.toast_overlay.add_toast(toast)
+
+        def worker():
+            res = subprocess.run([str(SWITCHER_BIN), "backup"], capture_output=True, text=True)
+
+            def done():
+                if res.returncode == 0:
+                    self.toast_overlay.add_toast(Adw.Toast.new("Snapshot created successfully!"))
+                else:
+                    self.toast_overlay.add_toast(Adw.Toast.new(f"Backup failed: {res.stderr}"))
+                self.refresh_profiles()
+
+            GLib.idle_add(done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def on_switch_clicked(self, profile_id: str, force: bool = False):
         toast = Adw.Toast.new(f"Switching to '{profile_id}'...")
         toast.set_timeout(2)
@@ -445,7 +799,7 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
                 else:
                     err_toast = Adw.Toast.new(f"Switch error: {res.stderr or 'Failed'}")
                     self.toast_overlay.add_toast(err_toast)
-                self.refresh_profiles()
+                self.refresh_all()
 
             GLib.idle_add(update_ui)
 
@@ -472,13 +826,13 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
                 if target.exists():
                     shutil.rmtree(target, ignore_errors=True)
                     self.toast_overlay.add_toast(Adw.Toast.new(f"Deleted profile: {profile_name}"))
-                    self.refresh_profiles()
+                    self.refresh_all()
 
         dialog.connect("response", on_response)
         dialog.present()
 
     def on_add_clicked(self, btn):
-        dialog = AddShellDialog(self, on_added_callback=self.refresh_profiles)
+        dialog = AddShellDialog(self, on_added_callback=self.refresh_all)
         dialog.present()
 
 
@@ -490,10 +844,8 @@ class ShellSwitcherApp(Adw.Application):
         )
 
     def do_activate(self):
-        # Force dark mode
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)
 
-        # Load Custom CSS
         disp = Gdk.Display.get_default()
         if disp:
             provider = Gtk.CssProvider()
