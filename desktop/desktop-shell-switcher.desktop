@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Desktop Shell Switcher
+Comment=Instantly switch between Hyprland rices, Waybar, Quickshell, Caelestia, DMS, and custom desktop shells
+Exec=desktop-shell-app
+Icon=preferences-desktop-theme
+Terminal=false
+Type=Application
+Categories=Utility;Settings;System;
+Keywords=shell;rice;switch;hyprland;quickshell;waybar;
+StartupNotify=true
