@@ -815,15 +815,26 @@ cmd_default() {
 }
 
 cmd_launcher() {
+    # 1. Process-aware detection: check if a known shell daemon is actively running
+    if pgrep -f "qs -c caelestia" >/dev/null 2>&1 || pgrep -f "caelestia" >/dev/null 2>&1; then
+        qs -c caelestia ipc call drawers toggle launcher 2>/dev/null || caelestia shell drawers toggle launcher 2>/dev/null
+        return 0
+    fi
+    if pgrep -x dms >/dev/null 2>&1 || pgrep -f "dms.*shell" >/dev/null 2>&1; then
+        dms ipc call spotlight toggle 2>/dev/null || dms dmenu
+        return 0
+    fi
+
+    # 2. Otherwise fallback to current profile setting
     local cur
     cur="$(get_current)"
     case "${cur}" in
         caelestia)
-            if command -v hyprctl >/dev/null 2>&1; then
-                hyprctl dispatch 'hl.dsp.global("caelestia:launcher")' 2>/dev/null || caelestia shell -d
-            else
-                caelestia shell -d
+            if ! pgrep -f "qs -c caelestia" >/dev/null 2>&1; then
+                caelestia shell -r -d >/dev/null 2>&1 &
+                sleep 0.5
             fi
+            qs -c caelestia ipc call drawers toggle launcher 2>/dev/null || caelestia shell drawers toggle launcher 2>/dev/null
             ;;
         dms)
             if command -v dms >/dev/null 2>&1; then
@@ -849,18 +860,29 @@ cmd_launcher() {
             elif command -v dms >/dev/null 2>&1; then
                 dms ipc call spotlight toggle 2>/dev/null || dms dmenu
             else
-                hyprctl dispatch 'hl.dsp.global("caelestia:launcher")' 2>/dev/null || true
+                qs -c caelestia ipc call drawers toggle launcher 2>/dev/null || caelestia shell drawers toggle launcher 2>/dev/null || true
             fi
             ;;
     esac
 }
 
 cmd_sidebar() {
+    # 1. Process-aware detection: check if a known shell daemon is actively running
+    if pgrep -f "qs -c caelestia" >/dev/null 2>&1 || pgrep -f "caelestia" >/dev/null 2>&1; then
+        qs -c caelestia ipc call drawers toggle sidebar 2>/dev/null || caelestia shell drawers toggle sidebar 2>/dev/null
+        return 0
+    fi
+    if pgrep -x dms >/dev/null 2>&1 || pgrep -f "dms.*shell" >/dev/null 2>&1; then
+        dms ipc call controlCenter toggle 2>/dev/null || dms ipc call notifications toggle 2>/dev/null || true
+        return 0
+    fi
+
+    # 2. Otherwise fallback to current profile setting
     local cur
     cur="$(get_current)"
     case "${cur}" in
         caelestia)
-            hyprctl dispatch 'hl.dsp.global("caelestia:sidebar")' 2>/dev/null || true
+            qs -c caelestia ipc call drawers toggle sidebar 2>/dev/null || caelestia shell drawers toggle sidebar 2>/dev/null || true
             ;;
         dms)
             if command -v dms >/dev/null 2>&1; then
@@ -873,7 +895,7 @@ cmd_sidebar() {
             elif command -v dms >/dev/null 2>&1; then
                 dms ipc call controlCenter toggle 2>/dev/null || true
             else
-                hyprctl dispatch 'hl.dsp.global("caelestia:sidebar")' 2>/dev/null || true
+                qs -c caelestia ipc call drawers toggle sidebar 2>/dev/null || caelestia shell drawers toggle sidebar 2>/dev/null || true
             fi
             ;;
     esac

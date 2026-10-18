@@ -17,16 +17,16 @@ declare -A CONFIG_MAP=(
 
 start_shell() {
     # Stop conflicting desktop shells
-    pkill -f "qs -c caelestia" 2>/dev/null || true
-    pkill -x qs 2>/dev/null || true
     pkill -x waybar 2>/dev/null || true
     pkill -x swaync 2>/dev/null || true
     pkill -x dms 2>/dev/null || true
 
-    sleep 0.4
     if command -v caelestia >/dev/null 2>&1; then
-        setsid caelestia shell -d >/dev/null 2>&1 &
+        setsid caelestia shell -r -d >/dev/null 2>&1 &
     elif command -v qs >/dev/null 2>&1; then
+        pkill -f "qs -c caelestia" 2>/dev/null || true
+        pkill -x qs 2>/dev/null || true
+        sleep 0.3
         setsid qs -c caelestia -n -d >/dev/null 2>&1 &
     fi
 }
