@@ -4,7 +4,7 @@ _shell_switch_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="list ls current get backup clone add remove delete rm gui menu help"
+    local commands="list ls current keybinds default set-default launcher sidebar get backup clone add remove delete rm gui menu help"
     local rices="caelestia hyde dms end4 ml4w 44dots"
 
     local profiles_dir="${HOME}/.config/desktop-shells"
@@ -19,6 +19,14 @@ _shell_switch_completions() {
     fi
 
     case "${prev}" in
+        keybinds|binds|keys)
+            COMPREPLY=( $(compgen -W "${profiles} match default" -- "${cur}") )
+            return 0
+            ;;
+        default|set-default)
+            COMPREPLY=( $(compgen -W "${profiles}" -- "${cur}") )
+            return 0
+            ;;
         get)
             COMPREPLY=( $(compgen -W "${rices}" -- "${cur}") )
             return 0
@@ -32,6 +40,9 @@ _shell_switch_completions() {
             return 0
             ;;
         *)
+            # Allow completing second argument (keybinds profile or --force) after selecting a shell
+            COMPREPLY=( $(compgen -W "${profiles} match default --force" -- "${cur}") )
+            return 0
             ;;
     esac
 }

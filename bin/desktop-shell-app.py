@@ -19,6 +19,9 @@ from gi.repository import Gtk, Gdk, Adw, GLib, Gio, Pango
 
 PROFILES_DIR = Path.home() / ".config" / "desktop-shells"
 CURRENT_FILE = PROFILES_DIR / "current"
+CURRENT_KEYBINDS_FILE = PROFILES_DIR / "current_keybinds"
+DEFAULT_SHELL_FILE = PROFILES_DIR / "default_shell"
+DEFAULT_KEYBINDS_FILE = PROFILES_DIR / "default_keybinds"
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 SWITCHER_BIN = PROJECT_DIR / "bin" / "shell-switch"
 if not SWITCHER_BIN.exists():
@@ -61,6 +64,26 @@ CUSTOM_CSS = """
     padding: 4px 12px;
     border-radius: 9999px;
 }
+
+.badge-keybinds {
+    background-color: alpha(@accent_color, 0.25);
+    color: @accent_color;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    border: 1px solid alpha(@accent_color, 0.4);
+}
+
+.badge-default {
+    background-color: alpha(#e5a50a, 0.2);
+    color: #f6d32d;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+}
+
 
 .tag-chip {
     background-color: alpha(@theme_fg_color, 0.08);
@@ -486,7 +509,22 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
     def get_current_shell(self):
         if CURRENT_FILE.exists():
             return CURRENT_FILE.read_text().strip()
+        return self.get_default_shell()
+
+    def get_current_keybinds(self):
+        if CURRENT_KEYBINDS_FILE.exists():
+            return CURRENT_KEYBINDS_FILE.read_text().strip()
+        return self.get_default_keybinds()
+
+    def get_default_shell(self):
+        if DEFAULT_SHELL_FILE.exists():
+            return DEFAULT_SHELL_FILE.read_text().strip()
         return "caelestia"
+
+    def get_default_keybinds(self):
+        if DEFAULT_KEYBINDS_FILE.exists():
+            return DEFAULT_KEYBINDS_FILE.read_text().strip()
+        return self.get_default_shell()
 
     def refresh_all(self):
         self.refresh_profiles()
@@ -499,7 +537,8 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         self.all_profile_cards.clear()
 
         current = self.get_current_shell()
-        self.switcher_title.set_subtitle(f"Active: {current}")
+        current_kb = self.get_current_keybinds()
+        self.switcher_title.set_subtitle(f"Active Shell: {current}  •  Keybinds: {current_kb}")
 
         PROFILES_DIR.mkdir(parents=True, exist_ok=True)
         profiles = []
@@ -578,6 +617,9 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         spacer.set_hexpand(True)
         top_row.append(spacer)
 
+        is_kb_active = (meta["id"] == self.get_current_keybinds())
+        is_default = (meta["id"] == self.get_default_shell())
+
         if is_active:
             active_badge = Gtk.Label(label="● Active Shell", css_classes=["badge-active"])
             top_row.append(active_badge)
@@ -589,6 +631,14 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
             switch_btn = Gtk.Button(label="Switch to this Shell", css_classes=["suggested-action", "pill"])
             switch_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_switch_clicked(mid))
             top_row.append(switch_btn)
+
+        if is_kb_active:
+            kb_badge = Gtk.Label(label="󰌌 Keybinds Active", css_classes=["badge-keybinds"])
+            top_row.append(kb_badge)
+
+        if is_default:
+            def_badge = Gtk.Label(label="★ Default", css_classes=["badge-default"])
+            top_row.append(def_badge)
 
         card.append(top_row)
 
@@ -627,6 +677,24 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         b_spacer.set_hexpand(True)
         bottom_row.append(b_spacer)
 
+        # Keybinds button
+        kb_btn = Gtk.Button(
+            icon_name="input-keyboard-symbolic",
+            tooltip_text=f"Use '{meta['name']}' keybinds across all rices",
+        )
+        if is_kb_active:
+            kb_btn.add_css_class("suggested-action")
+        kb_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_keybinds_clicked(mid))
+        bottom_row.append(kb_btn)
+
+        # Default shell button
+        def_btn = Gtk.Button(
+            icon_name="starred-symbolic" if is_default else "non-starred-symbolic",
+            tooltip_text=f"Set '{meta['name']}' as default shell & keybinds",
+        )
+        def_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_set_default_clicked(mid))
+        bottom_row.append(def_btn)
+
         # Folder button
         folder_btn = Gtk.Button(icon_name="folder-symbolic", tooltip_text="Open Profile Directory")
         folder_btn.connect("clicked", lambda b, mid=meta["id"]: self.open_folder(mid))
@@ -641,6 +709,7 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
 
         card.append(bottom_row)
         return card
+
 
     def refresh_explore(self):
         while child := self.explore_cards_box.get_first_child():
@@ -804,6 +873,44 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
             GLib.idle_add(update_ui)
 
         threading.Thread(target=run_switch, daemon=True).start()
+
+    def on_keybinds_clicked(self, profile_id: str):
+        toast = Adw.Toast.new(f"Setting keybinds profile to '{profile_id}'...")
+        toast.set_timeout(2)
+        self.toast_overlay.add_toast(toast)
+
+        def worker():
+            res = subprocess.run([str(SWITCHER_BIN), "keybinds", profile_id], capture_output=True, text=True)
+
+            def done():
+                if res.returncode == 0:
+                    self.toast_overlay.add_toast(Adw.Toast.new(f"Keybinds switched to: {profile_id}!"))
+                else:
+                    self.toast_overlay.add_toast(Adw.Toast.new(f"Error setting keybinds: {res.stderr}"))
+                self.refresh_profiles()
+
+            GLib.idle_add(done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_set_default_clicked(self, profile_id: str):
+        toast = Adw.Toast.new(f"Setting default desktop to '{profile_id}'...")
+        toast.set_timeout(2)
+        self.toast_overlay.add_toast(toast)
+
+        def worker():
+            res = subprocess.run([str(SWITCHER_BIN), "set-default", profile_id], capture_output=True, text=True)
+
+            def done():
+                if res.returncode == 0:
+                    self.toast_overlay.add_toast(Adw.Toast.new(f"Default shell set to: {profile_id}!"))
+                else:
+                    self.toast_overlay.add_toast(Adw.Toast.new(f"Error setting default: {res.stderr}"))
+                self.refresh_profiles()
+
+            GLib.idle_add(done)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def open_folder(self, profile_id: str):
         target = PROFILES_DIR / profile_id

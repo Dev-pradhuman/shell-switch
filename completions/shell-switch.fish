@@ -15,7 +15,12 @@ end
 complete -c shell-switch -f
 complete -c shell-switch -n "__fish_use_subcommand" -a list -d "List available shell profiles"
 complete -c shell-switch -n "__fish_use_subcommand" -a ls -d "List available shell profiles"
-complete -c shell-switch -n "__fish_use_subcommand" -a current -d "Show active shell"
+complete -c shell-switch -n "__fish_use_subcommand" -a current -d "Show active shell and keybinds"
+complete -c shell-switch -n "__fish_use_subcommand" -a keybinds -d "View or switch Hyprland keybinds profile"
+complete -c shell-switch -n "__fish_use_subcommand" -a default -d "View or set default shell & keybinds"
+complete -c shell-switch -n "__fish_use_subcommand" -a set-default -d "Set default shell & keybinds"
+complete -c shell-switch -n "__fish_use_subcommand" -a launcher -d "Launch active desktop app launcher"
+complete -c shell-switch -n "__fish_use_subcommand" -a sidebar -d "Toggle active desktop notification sidebar"
 complete -c shell-switch -n "__fish_use_subcommand" -a get -d "Explore and install popular desktop rices"
 complete -c shell-switch -n "__fish_use_subcommand" -a backup -d "Snapshot active desktop configuration"
 complete -c shell-switch -n "__fish_use_subcommand" -a clone -d "Clone GitHub dotfiles repository"
@@ -31,4 +36,7 @@ complete -c shell-switch -n "__fish_use_subcommand" -a "(__fish_shell_switch_pro
 
 # Subcommand arguments
 complete -c shell-switch -n "__fish_seen_subcommand_from get" -a "(__fish_shell_switch_rices)"
+complete -c shell-switch -n "__fish_seen_subcommand_from keybinds" -a "(__fish_shell_switch_profiles) match default" -d "Keybinds profile"
+complete -c shell-switch -n "__fish_seen_subcommand_from default set-default" -a "(__fish_shell_switch_profiles)" -d "Default profile"
 complete -c shell-switch -n "__fish_seen_subcommand_from remove rm delete" -a "(__fish_shell_switch_profiles)" -d "Profile to delete"
+

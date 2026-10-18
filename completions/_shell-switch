@@ -6,7 +6,12 @@ _shell_switch() {
     commands=(
         'list:List all available desktop shell profiles'
         'ls:List all available desktop shell profiles'
-        'current:Show currently active shell'
+        'current:Show currently active shell and keybinds'
+        'keybinds:View or switch active Hyprland keybinds profile'
+        'default:View or set default shell & keybinds'
+        'set-default:Set default shell & keybinds'
+        'launcher:Launch active desktop native app launcher'
+        'sidebar:Toggle active desktop native notification sidebar'
         'get:Download and install a popular desktop rice'
         'backup:Create a snapshot of current desktop configuration'
         'clone:Clone a GitHub dotfiles repository as a shell profile'
@@ -47,11 +52,20 @@ _shell_switch() {
             ;;
         argument)
             case "$words[2]" in
+                keybinds|binds|keys)
+                    _describe -t profiles 'keybinds profile' profiles
+                    ;;
+                default|set-default)
+                    _describe -t profiles 'default shell' profiles
+                    ;;
                 get)
                     _describe -t rices 'available rice' rices
                     ;;
                 remove|rm|delete)
                     _describe -t profiles 'profile to remove' profiles
+                    ;;
+                *)
+                    _describe -t profiles 'keybinds profile' profiles
                     ;;
             esac
             ;;

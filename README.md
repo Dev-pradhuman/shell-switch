@@ -156,17 +156,31 @@ shell-switch gui
 # List all installed shells and active profile
 shell-switch list
 
-# Show the currently active shell
+# Show the currently active shell, keybinds, and defaults
 shell-switch current
 
-# Switch to a shell immediately (with tab auto-completion!)
-shell-switch caelestia
-shell-switch hyde
+# Switch to a shell immediately (uses default Caelestia keybinds!)
 shell-switch dms
 shell-switch 44dots
+shell-switch hyde
 shell-switch ml4w
 shell-switch end4
-shell-switch 43pr
+shell-switch caelestia
+
+# ⌨️ Independent Keybinds Switching (Decoupled Keybinds)
+shell-switch keybinds                 # View active keybinds profile and available options
+shell-switch keybinds caelestia       # Set Caelestia keybinds across all desktop rices
+shell-switch keybinds match           # Make keybinds follow whatever UI shell is active
+shell-switch dms caelestia            # Hot-swap UI to DMS while keeping Caelestia keybinds!
+shell-switch 44dots hyde              # UI from 44dots, keybinds from HyDE
+
+# ⚙️ Default Desktop & Keybinds Configuration
+shell-switch default                  # View default desktop and keybinds
+shell-switch set-default caelestia    # Set default shell (and its keybinds) for the system
+
+# 🚀 Adaptive Launcher & Sidebar Dispatchers
+shell-switch launcher                 # Intelligently toggles active desktop's native launcher
+shell-switch sidebar                  # Intelligently toggles active desktop's native notification center
 
 # Explore community rice catalog & 1-click install
 shell-switch get            # View available rice catalog
@@ -186,6 +200,22 @@ shell-switch caelestia --force
 # Clone any GitHub dotfiles repo directly as a shell
 shell-switch clone https://github.com/username/my-rice.git my-rice
 ```
+
+---
+
+### ⌨️ Independent Keybinds & Unified Muscle Memory
+
+When switching between desktop rices, losing your muscle memory or having conflicting Hyprland keybinds is frustrating. **Desktop Shell Switcher decouples your visual UI shell from your Hyprland keybindings:**
+
+- **Universal Caelestia Keybinds by Default:** By default, all installed and explored desktop rices (DankMaterialShell, 44dots, HyDE, end-4, ML4W) inherit Caelestia's comprehensive Lua keybinding system.
+- **Independent Control (UI = Shell 1, Keybinds = Shell 2):** Run DankMaterialShell's modern dock and panels while retaining Caelestia's window movements, workspace cycling, and app binds (`shell-switch dms caelestia`).
+- **Smart Adaptive Dispatcher:** Keys like `Super` (launcher) and `Super + N` (sidebar/notification center) dynamically adapt:
+  - In **Caelestia:** opens Caelestia drawers
+  - In **DankMaterialShell:** toggles DMS Spotlight and Control Center
+  - In **HyDE / 44dots:** toggles Rofi and SwayNC
+  - In **end-4:** toggles Fuzzel
+- **Customizable Default:** Pick any shell as your baseline default with `shell-switch set-default <shell>`.
+
 
 ---
 

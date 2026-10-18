@@ -8,6 +8,9 @@ set -euo pipefail
 
 PROFILES_DIR="${HOME}/.config/desktop-shells"
 CURRENT_FILE="${PROFILES_DIR}/current"
+CURRENT_KEYBINDS_FILE="${PROFILES_DIR}/current_keybinds"
+DEFAULT_SHELL_FILE="${PROFILES_DIR}/default_shell"
+DEFAULT_KEYBINDS_FILE="${PROFILES_DIR}/default_keybinds"
 
 # Ensure profiles directory exists
 mkdir -p "${PROFILES_DIR}"
@@ -21,11 +24,67 @@ RED="\033[1;31m"
 MUTED="\033[0;90m"
 RESET="\033[0m"
 
-get_current() {
-    if [[ -f "${CURRENT_FILE}" ]]; then
-        cat "${CURRENT_FILE}" 2>/dev/null || echo "caelestia"
+get_default_shell() {
+    if [[ -f "${DEFAULT_SHELL_FILE}" ]]; then
+        cat "${DEFAULT_SHELL_FILE}" 2>/dev/null || echo "caelestia"
     else
         echo "caelestia"
+    fi
+}
+
+get_default_keybinds() {
+    if [[ -f "${DEFAULT_KEYBINDS_FILE}" ]]; then
+        cat "${DEFAULT_KEYBINDS_FILE}" 2>/dev/null || get_default_shell
+    else
+        get_default_shell
+    fi
+}
+
+get_current() {
+    if [[ -f "${CURRENT_FILE}" ]]; then
+        cat "${CURRENT_FILE}" 2>/dev/null || get_default_shell
+    else
+        get_default_shell
+    fi
+}
+
+get_current_keybinds() {
+    if [[ -f "${CURRENT_KEYBINDS_FILE}" ]]; then
+        cat "${CURRENT_KEYBINDS_FILE}" 2>/dev/null || get_default_keybinds
+    else
+        get_default_keybinds
+    fi
+}
+
+find_hypr_dir() {
+    local pname="$1"
+    local pdir="${PROFILES_DIR}/${pname}"
+    if [[ -d "${pdir}/hypr" ]]; then
+        echo "${pdir}/hypr"
+    elif [[ -d "${pdir}/repo/hypr" ]]; then
+        echo "${pdir}/repo/hypr"
+    elif [[ -d "${pdir}/repo/Configs/.config/hypr" ]]; then
+        echo "${pdir}/repo/Configs/.config/hypr"
+    elif [[ -d "${pdir}/repo/dotfiles/.config/hypr" ]]; then
+        echo "${pdir}/repo/dotfiles/.config/hypr"
+    elif [[ -d "${pdir}/repo/dots/.config/hypr" ]]; then
+        echo "${pdir}/repo/dots/.config/hypr"
+    elif [[ -d "${PROFILES_DIR}/caelestia/hypr" ]]; then
+        echo "${PROFILES_DIR}/caelestia/hypr"
+    else
+        echo ""
+    fi
+}
+
+resolve_keybinds_profile() {
+    local kb="$1"
+    local cur_shell="$2"
+    if [[ "${kb}" == "match" || "${kb}" == "rice" ]]; then
+        echo "${cur_shell}"
+    elif [[ -z "${kb}" || "${kb}" == "default" ]]; then
+        get_default_keybinds
+    else
+        echo "${kb}"
     fi
 }
 
@@ -44,10 +103,19 @@ notify_user() {
 }
 
 cmd_current() {
-    local cur
+    local cur cur_kb def_sh def_kb
     cur="$(get_current)"
-    printf "${BOLD}Current Shell:${RESET} ${GREEN}%s${RESET}\n" "${cur}"
+    cur_kb="$(get_current_keybinds)"
+    def_sh="$(get_default_shell)"
+    def_kb="$(get_default_keybinds)"
+
+    printf "\n${BOLD}Desktop Shell Switcher Status:${RESET}\n"
+    printf "  ${BOLD}Active Shell:${RESET}    ${GREEN}%s${RESET}\n" "${cur}"
+    printf "  ${BOLD}Active Keybinds:${RESET} ${CYAN}%s${RESET}\n" "${cur_kb}"
+    printf "  ${BOLD}Default Shell:${RESET}   %s\n" "${def_sh}"
+    printf "  ${BOLD}Default Binds:${RESET}   %s\n\n" "${def_kb}"
 }
+
 
 cmd_list() {
     local cur
@@ -87,7 +155,16 @@ cmd_list() {
 
 cmd_switch() {
     local target="${1:-}"
-    local force="${2:-false}"
+    local kb_arg="${2:-}"
+    local force="false"
+
+    if [[ "${kb_arg}" == "--force" || "${kb_arg}" == "true" ]]; then
+        force="true"
+        kb_arg=""
+    fi
+    if [[ "${3:-}" == "--force" || "${3:-}" == "true" ]]; then
+        force="true"
+    fi
 
     if [[ -z "${target}" ]]; then
         printf "${RED}Error:${RESET} No shell profile specified.\n"
@@ -106,14 +183,30 @@ cmd_switch() {
 
     local current
     current="$(get_current)"
+    local current_kb
+    current_kb="$(get_current_keybinds)"
 
-    if [[ "${target}" == "${current}" && "${force}" != "true" && "${force}" != "--force" ]]; then
-        printf "${YELLOW}Notice:${RESET} '%s' is already the active desktop shell.\n" "${target}"
-        printf "Use ${BOLD}shell-switch %s --force${RESET} to reload it anyway.\n" "${target}"
-        return 0
+    if [[ -n "${kb_arg}" ]]; then
+        current_kb="${kb_arg}"
+        echo "${current_kb}" > "${CURRENT_KEYBINDS_FILE}"
     fi
 
-    printf "${CYAN}→ Switching desktop shell from %s to %s...${RESET}\n" "${current}" "${target}"
+    local resolved_kb
+    resolved_kb="$(resolve_keybinds_profile "${current_kb}" "${target}")"
+
+    if [[ "${target}" == "${current}" && "${force}" != "true" ]]; then
+        local current_linked_hypr
+        current_linked_hypr="$(readlink -f "${HOME}/.config/hypr" 2>/dev/null || echo "")"
+        local expected_hypr
+        expected_hypr="$(readlink -f "$(find_hypr_dir "${resolved_kb}")" 2>/dev/null || echo "")"
+        if [[ "${current_linked_hypr}" == "${expected_hypr}" && -n "${current_linked_hypr}" ]]; then
+            printf "${YELLOW}Notice:${RESET} '%s' is already active with keybinds '%s'.\n" "${target}" "${current_kb}"
+            printf "Use ${BOLD}shell-switch %s --force${RESET} to reload it anyway.\n" "${target}"
+            return 0
+        fi
+    fi
+
+    printf "${CYAN}→ Switching desktop shell to '%s' (Keybinds: '%s')...${RESET}\n" "${target}" "${current_kb}"
 
     # 1. Stop current shell if profile exists
     local cur_profile="${PROFILES_DIR}/${current}/profile.sh"
@@ -136,8 +229,19 @@ cmd_switch() {
     source "${target_profile}"
 
     # 3. Swap symlinks for defined configs
+    local hypr_to_link=""
+    if [[ "${resolved_kb}" == "${target}" && -n "${CONFIG_MAP[hypr]:-}" ]]; then
+        hypr_to_link="${CONFIG_MAP[hypr]}"
+    else
+        hypr_to_link="$(find_hypr_dir "${resolved_kb}")"
+    fi
+
     if declare -p CONFIG_MAP >/dev/null 2>&1; then
         for cfg_name in "${!CONFIG_MAP[@]}"; do
+            if [[ "${cfg_name}" == "hypr" ]]; then
+                continue
+            fi
+
             local src_path="${CONFIG_MAP[${cfg_name}]}"
             local dest_path="${HOME}/.config/${cfg_name}"
 
@@ -195,6 +299,22 @@ BAKEOF
         done
     fi
 
+    # Link hypr keybinds configuration (from resolved keybinds profile)
+    if [[ -n "${hypr_to_link}" && -d "${hypr_to_link}" ]]; then
+        local dest_hypr="${HOME}/.config/hypr"
+        if [[ -d "${dest_hypr}" && ! -L "${dest_hypr}" ]]; then
+            local backup_dir="${PROFILES_DIR}/original/hypr"
+            printf "  ${YELLOW}Preserving existing real ~/.config/hypr into %s${RESET}\n" "${backup_dir}"
+            mkdir -p "${PROFILES_DIR}/original"
+            cp -a "${dest_hypr}" "${backup_dir}"
+            rm -rf "${dest_hypr}"
+        else
+            rm -rf "${dest_hypr}"
+        fi
+        printf "  Linking ~/.config/hypr -> %s (Keybinds: %s)\n" "${hypr_to_link}" "${current_kb}"
+        ln -sfn "${hypr_to_link}" "${dest_hypr}"
+    fi
+
     # 4. Reload Hyprland configuration
     if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
         printf "  Reloading Hyprland...\n"
@@ -209,12 +329,13 @@ BAKEOF
     fi
     disown -a 2>/dev/null || true
 
-    # 6. Update current shell marker
+    # 6. Update current shell & keybind markers
     echo "${target}" > "${CURRENT_FILE}"
+    echo "${current_kb}" > "${CURRENT_KEYBINDS_FILE}"
 
     local display_name="${NAME:-${target}}"
-    printf "${GREEN}✔ Successfully switched to %s!${RESET}\n" "${display_name}"
-    notify_user "Desktop Shell Switched" "Active shell is now: ${display_name}" "${ICON:-preferences-desktop-theme}"
+    printf "${GREEN}✔ Successfully switched to %s!${RESET} ${CYAN}[Keybinds: %s]${RESET}\n" "${display_name}" "${current_kb}"
+    notify_user "Desktop Shell Switched" "Active: ${display_name} | Keybinds: ${current_kb}" "${ICON:-preferences-desktop-theme}"
 }
 
 cmd_gui() {
@@ -592,14 +713,183 @@ cmd_remove() {
     printf "${GREEN}✔ Removed profile '%s'.${RESET}\n" "${target}"
 }
 
+cmd_keybinds() {
+    local target="${1:-}"
+    if [[ -z "${target}" ]]; then
+        local cur_kb
+        cur_kb="$(get_current_keybinds)"
+        local cur_shell
+        cur_shell="$(get_current)"
+        local def_kb
+        def_kb="$(get_default_keybinds)"
+        local def_shell
+        def_shell="$(get_default_shell)"
+
+        printf "\n${BOLD}Desktop Keybinds Configuration:${RESET}\n\n"
+        printf "  ${BOLD}Active Keybinds Profile:${RESET}  ${GREEN}%s${RESET}\n" "${cur_kb}"
+        printf "  ${BOLD}Active Desktop Shell:${RESET}     ${CYAN}%s${RESET}\n" "${cur_shell}"
+        printf "  ${BOLD}Default Keybinds Profile:${RESET} %s\n" "${def_kb}"
+        printf "  ${BOLD}Default Shell:${RESET}            %s\n\n" "${def_shell}"
+
+        printf "${BOLD}Available Keybind Profiles:${RESET}\n"
+        for pdir in "${PROFILES_DIR}"/*; do
+            [[ -d "${pdir}" ]] || continue
+            local id
+            id="$(basename "${pdir}")"
+            local hypr_dir
+            hypr_dir="$(find_hypr_dir "${id}")"
+            if [[ -n "${hypr_dir}" && -d "${hypr_dir}" ]]; then
+                if [[ "${id}" == "${cur_kb}" ]]; then
+                    printf "  ${GREEN}● %-12s${RESET} ${CYAN}[ACTIVE]${RESET}\n" "${id}"
+                else
+                    printf "    %-12s\n" "${id}"
+                fi
+            fi
+        done
+        printf "    %-12s ${MUTED}(Follow active desktop shell)${RESET}\n" "match"
+        printf "    %-12s ${MUTED}(Reset to default: %s)${RESET}\n\n" "default" "${def_kb}"
+
+        printf "Usage:\n"
+        printf "  ${GREEN}shell-switch keybinds <profile|match|default>${RESET} - Change active keybinds\n"
+        printf "  ${GREEN}shell-switch <shell> <keybinds>${RESET}              - Switch shell and keybinds together\n\n"
+        return 0
+    fi
+
+    local cur_shell
+    cur_shell="$(get_current)"
+    local resolved
+    resolved="$(resolve_keybinds_profile "${target}" "${cur_shell}")"
+
+    local hypr_dir
+    hypr_dir="$(find_hypr_dir "${resolved}")"
+    if [[ -z "${hypr_dir}" || ! -d "${hypr_dir}" ]]; then
+        printf "${RED}Error:${RESET} No Hyprland keybinds configuration found for profile '%s'.\n" "${target}"
+        exit 1
+    fi
+
+    printf "${CYAN}→ Switching keybinds profile to '%s' (%s)...${RESET}\n" "${target}" "${hypr_dir}"
+    echo "${target}" > "${CURRENT_KEYBINDS_FILE}"
+
+    local dest_path="${HOME}/.config/hypr"
+    if [[ -d "${dest_path}" && ! -L "${dest_path}" ]]; then
+        mkdir -p "${PROFILES_DIR}/original/hypr"
+        cp -a "${dest_path}" "${PROFILES_DIR}/original/hypr"
+        rm -rf "${dest_path}"
+    else
+        rm -rf "${dest_path}"
+    fi
+
+    ln -sfn "${hypr_dir}" "${dest_path}"
+    printf "  Linked ~/.config/hypr -> %s\n" "${hypr_dir}"
+
+    if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        printf "  Reloading Hyprland...\n"
+        hyprctl reload >/dev/null 2>&1 || true
+    fi
+
+    printf "${GREEN}✔ Keybinds successfully set to: %s!${RESET}\n" "${target}"
+    notify_user "Keybinds Profile Updated" "Active keybinds: ${target}" "input-keyboard"
+}
+
+cmd_default() {
+    local target="${1:-}"
+    if [[ -z "${target}" ]]; then
+        printf "\n${BOLD}Default Desktop Configuration:${RESET}\n"
+        printf "  Default Shell:    ${GREEN}%s${RESET}\n" "$(get_default_shell)"
+        printf "  Default Keybinds: ${GREEN}%s${RESET}\n\n" "$(get_default_keybinds)"
+        printf "To change default shell:\n"
+        printf "  ${GREEN}shell-switch set-default <shell>${RESET}\n\n"
+        return 0
+    fi
+
+    local target_dir="${PROFILES_DIR}/${target}"
+    if [[ ! -d "${target_dir}" ]]; then
+        printf "${RED}Error:${RESET} Profile '%s' not found.\n" "${target}"
+        exit 1
+    fi
+
+    echo "${target}" > "${DEFAULT_SHELL_FILE}"
+    echo "${target}" > "${DEFAULT_KEYBINDS_FILE}"
+    printf "${GREEN}✔ Default shell and default keybinds set to '%s'!${RESET}\n" "${target}"
+}
+
+cmd_launcher() {
+    local cur
+    cur="$(get_current)"
+    case "${cur}" in
+        caelestia)
+            if command -v hyprctl >/dev/null 2>&1; then
+                hyprctl dispatch 'hl.dsp.global("caelestia:launcher")' 2>/dev/null || caelestia shell -d
+            else
+                caelestia shell -d
+            fi
+            ;;
+        dms)
+            if command -v dms >/dev/null 2>&1; then
+                dms ipc call spotlight toggle 2>/dev/null || dms dmenu
+            elif command -v rofi >/dev/null 2>&1; then
+                rofi -show drun
+            elif command -v fuzzel >/dev/null 2>&1; then
+                fuzzel
+            fi
+            ;;
+        end4)
+            if command -v fuzzel >/dev/null 2>&1; then
+                fuzzel
+            elif command -v rofi >/dev/null 2>&1; then
+                rofi -show drun
+            fi
+            ;;
+        *)
+            if command -v rofi >/dev/null 2>&1; then
+                rofi -show drun
+            elif command -v fuzzel >/dev/null 2>&1; then
+                fuzzel
+            elif command -v dms >/dev/null 2>&1; then
+                dms ipc call spotlight toggle 2>/dev/null || dms dmenu
+            else
+                hyprctl dispatch 'hl.dsp.global("caelestia:launcher")' 2>/dev/null || true
+            fi
+            ;;
+    esac
+}
+
+cmd_sidebar() {
+    local cur
+    cur="$(get_current)"
+    case "${cur}" in
+        caelestia)
+            hyprctl dispatch 'hl.dsp.global("caelestia:sidebar")' 2>/dev/null || true
+            ;;
+        dms)
+            if command -v dms >/dev/null 2>&1; then
+                dms ipc call controlCenter toggle 2>/dev/null || dms ipc call notifications toggle 2>/dev/null || true
+            fi
+            ;;
+        *)
+            if command -v swaync-client >/dev/null 2>&1; then
+                swaync-client -t -sw 2>/dev/null || true
+            elif command -v dms >/dev/null 2>&1; then
+                dms ipc call controlCenter toggle 2>/dev/null || true
+            else
+                hyprctl dispatch 'hl.dsp.global("caelestia:sidebar")' 2>/dev/null || true
+            fi
+            ;;
+    esac
+}
+
 cmd_help() {
     printf "\n${BOLD}Desktop Shell Switcher (${CYAN}shell-switch${RESET}${BOLD})${RESET}\n"
-    printf "Instantly switch between Caelestia, 43PR, 44 Dots, and other desktop rices.\n\n"
+    printf "Instantly switch between Caelestia, DankMaterialShell, 44 Dots, and other desktop rices.\n\n"
     printf "Usage:\n"
     printf "  ${GREEN}shell-switch${RESET}                     Open interactive GUI switcher (Libadwaita/Rofi)\n"
-    printf "  ${GREEN}shell-switch <name>${RESET}              Switch immediately to a shell profile\n"
+    printf "  ${GREEN}shell-switch <name> [keybinds]${RESET}   Switch immediately to a shell (and optional keybinds)\n"
+    printf "  ${GREEN}shell-switch keybinds [profile]${RESET}  View or change active keybinds profile (e.g. caelestia)\n"
+    printf "  ${GREEN}shell-switch set-default <shell>${RESET} Set your default desktop shell & keybinds\n"
     printf "  ${GREEN}shell-switch list${RESET} (or ${GREEN}ls${RESET})        List all available shell profiles\n"
-    printf "  ${GREEN}shell-switch current${RESET}             Show the currently active shell\n"
+    printf "  ${GREEN}shell-switch current${RESET}             Show active shell, keybinds, and defaults\n"
+    printf "  ${GREEN}shell-switch launcher${RESET}            Launch active desktop's native app launcher\n"
+    printf "  ${GREEN}shell-switch sidebar${RESET}             Toggle active desktop's notification/sidebar\n"
     printf "  ${GREEN}shell-switch get [rice_id]${RESET}       Explore or 1-click install popular rices\n"
     printf "  ${GREEN}shell-switch backup [name]${RESET}       Snapshot active desktop configuration\n"
     printf "  ${GREEN}shell-switch clone <url> [name]${RESET}  Clone a GitHub dotfiles repo as a shell\n"
@@ -631,6 +921,18 @@ case "${ACTION}" in
     current)
         cmd_current
         ;;
+    keybinds|binds|keys)
+        cmd_keybinds "${2:-}"
+        ;;
+    default|set-default)
+        cmd_default "${2:-}"
+        ;;
+    launcher)
+        cmd_launcher
+        ;;
+    sidebar)
+        cmd_sidebar
+        ;;
     get)
         cmd_get "${2:-}"
         ;;
@@ -650,6 +952,7 @@ case "${ACTION}" in
         cmd_help
         ;;
     *)
-        cmd_switch "${ACTION}" "${2:-false}"
+        cmd_switch "${ACTION}" "${2:-}" "${3:-}"
         ;;
 esac
+
