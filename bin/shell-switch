@@ -750,8 +750,8 @@ cmd_keybinds() {
         printf "    %-12s ${MUTED}(Reset to default: %s)${RESET}\n\n" "default" "${def_kb}"
 
         printf "Usage:\n"
-        printf "  ${GREEN}shell-switch keybinds <profile|match|default>${RESET} - Change active keybinds\n"
-        printf "  ${GREEN}shell-switch <shell> <keybinds>${RESET}              - Switch shell and keybinds together\n\n"
+        printf "  ${GREEN}rice keybinds <profile|match|default>${RESET} - Change active keybinds\n"
+        printf "  ${GREEN}rice <shell> <keybinds>${RESET}              - Switch shell and keybinds together\n\n"
         return 0
     fi
 
@@ -798,9 +798,10 @@ cmd_default() {
         printf "  Default Shell:    ${GREEN}%s${RESET}\n" "$(get_default_shell)"
         printf "  Default Keybinds: ${GREEN}%s${RESET}\n\n" "$(get_default_keybinds)"
         printf "To change default shell:\n"
-        printf "  ${GREEN}shell-switch set-default <shell>${RESET}\n\n"
+        printf "  ${GREEN}rice set-default <shell>${RESET}\n\n"
         return 0
     fi
+
 
     local target_dir="${PROFILES_DIR}/${target}"
     if [[ ! -d "${target_dir}" ]]; then
