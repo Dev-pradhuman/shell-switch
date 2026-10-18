@@ -15,6 +15,7 @@ declare -A CONFIG_MAP=(
 )
 
 start_shell() {
+    systemctl --user stop swaync.service 2>/dev/null || true
     pkill -x qs 2>/dev/null || true
     pkill -f "qs -c caelestia" 2>/dev/null || true
     pkill -x waybar 2>/dev/null || true
