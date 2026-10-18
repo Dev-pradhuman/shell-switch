@@ -879,24 +879,25 @@ cmd_sidebar() {
 }
 
 cmd_help() {
-    printf "\n${BOLD}Desktop Shell Switcher (${CYAN}shell-switch${RESET}${BOLD})${RESET}\n"
+    printf "\n${BOLD}Desktop Shell Switcher (${CYAN}rice${RESET}${BOLD} / ${CYAN}shell-switch${RESET}${BOLD})${RESET}\n"
     printf "Instantly switch between Caelestia, DankMaterialShell, 44 Dots, and other desktop rices.\n\n"
     printf "Usage:\n"
-    printf "  ${GREEN}shell-switch${RESET}                     Open interactive GUI switcher (Libadwaita/Rofi)\n"
-    printf "  ${GREEN}shell-switch <name> [keybinds]${RESET}   Switch immediately to a shell (and optional keybinds)\n"
-    printf "  ${GREEN}shell-switch keybinds [profile]${RESET}  View or change active keybinds profile (e.g. caelestia)\n"
-    printf "  ${GREEN}shell-switch set-default <shell>${RESET} Set your default desktop shell & keybinds\n"
-    printf "  ${GREEN}shell-switch list${RESET} (or ${GREEN}ls${RESET})        List all available shell profiles\n"
-    printf "  ${GREEN}shell-switch current${RESET}             Show active shell, keybinds, and defaults\n"
-    printf "  ${GREEN}shell-switch launcher${RESET}            Launch active desktop's native app launcher\n"
-    printf "  ${GREEN}shell-switch sidebar${RESET}             Toggle active desktop's notification/sidebar\n"
-    printf "  ${GREEN}shell-switch get [rice_id]${RESET}       Explore or 1-click install popular rices\n"
-    printf "  ${GREEN}shell-switch backup [name]${RESET}       Snapshot active desktop configuration\n"
-    printf "  ${GREEN}shell-switch clone <url> [name]${RESET}  Clone a GitHub dotfiles repo as a shell\n"
-    printf "  ${GREEN}shell-switch add <name>${RESET}          Create a new shell profile template\n"
-    printf "  ${GREEN}shell-switch remove <name>${RESET}       Remove an installed shell profile\n"
-    printf "  ${GREEN}shell-switch help${RESET}                Show this help message\n\n"
+    printf "  ${GREEN}rice${RESET}                     Open interactive GUI switcher (Libadwaita/Rofi)\n"
+    printf "  ${GREEN}rice <name> [keybinds]${RESET}   Switch immediately to a shell (and optional keybinds)\n"
+    printf "  ${GREEN}rice keybinds [profile]${RESET}  View or change active keybinds profile (e.g. caelestia)\n"
+    printf "  ${GREEN}rice set-default <shell>${RESET} Set your default desktop shell & keybinds\n"
+    printf "  ${GREEN}rice list${RESET} (or ${GREEN}ls${RESET})        List all available shell profiles\n"
+    printf "  ${GREEN}rice current${RESET}             Show active shell, keybinds, and defaults\n"
+    printf "  ${GREEN}rice launcher${RESET}            Launch active desktop's native app launcher\n"
+    printf "  ${GREEN}rice sidebar${RESET}             Toggle active desktop's notification/sidebar\n"
+    printf "  ${GREEN}rice get [rice_id]${RESET}       Explore or 1-click install popular rices\n"
+    printf "  ${GREEN}rice backup [name]${RESET}       Snapshot active desktop configuration\n"
+    printf "  ${GREEN}rice clone <url> [name]${RESET}  Clone a GitHub dotfiles repo as a shell\n"
+    printf "  ${GREEN}rice add <name>${RESET}          Create a new shell profile template\n"
+    printf "  ${GREEN}rice remove <name>${RESET}       Remove an installed shell profile\n"
+    printf "  ${GREEN}rice help${RESET}                Show this help message\n\n"
 }
+
 
 # Main routing
 ACTION="${1:-}"

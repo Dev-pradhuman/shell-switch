@@ -49,6 +49,7 @@ fi
 # 3. Copy binaries
 echo -e "\n${BOLD}Installing CLI and GUI binaries to ${BIN_DIR}...${RESET}"
 cp -f "${SCRIPT_DIR}/bin/shell-switch" "${BIN_DIR}/shell-switch"
+ln -sfn "shell-switch" "${BIN_DIR}/rice"
 cp -f "${SCRIPT_DIR}/bin/desktop-shell-app.py" "${BIN_DIR}/desktop-shell-app"
 chmod +x "${BIN_DIR}/shell-switch" "${BIN_DIR}/desktop-shell-app"
 
@@ -60,18 +61,22 @@ if command -v update-desktop-database >/dev/null 2>&1; then
 fi
 
 # 5. Install shell completions
-echo -e "${BOLD}Installing shell auto-completions (Bash, Zsh, Fish)...${RESET}"
+echo -e "${BOLD}Installing shell auto-completions (Bash, Zsh, Fish) for rice & shell-switch...${RESET}"
 BASH_COMP_DIR="${HOME}/.local/share/bash-completion/completions"
 ZSH_COMP_DIR="${HOME}/.local/share/zsh/site-functions"
 FISH_COMP_DIR="${HOME}/.config/fish/completions"
 
 mkdir -p "${BASH_COMP_DIR}" "${ZSH_COMP_DIR}" "${FISH_COMP_DIR}"
 cp -f "${SCRIPT_DIR}/completions/shell-switch.bash" "${BASH_COMP_DIR}/shell-switch"
+cp -f "${SCRIPT_DIR}/completions/shell-switch.bash" "${BASH_COMP_DIR}/rice"
 cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${ZSH_COMP_DIR}/_shell-switch"
+cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${ZSH_COMP_DIR}/_rice"
 cp -f "${SCRIPT_DIR}/completions/shell-switch.fish" "${FISH_COMP_DIR}/shell-switch.fish"
+cp -f "${SCRIPT_DIR}/completions/shell-switch.fish" "${FISH_COMP_DIR}/rice.fish"
 
 if [[ -d "${HOME}/.zfunc" ]]; then
     cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${HOME}/.zfunc/_shell-switch"
+    cp -f "${SCRIPT_DIR}/completions/_shell-switch" "${HOME}/.zfunc/_rice"
 fi
 
 # 6. Populate example profiles if profiles directory is empty
@@ -79,10 +84,13 @@ if [[ ! -f "${PROFILES_DIR}/current" ]]; then
     if [[ -d "${SCRIPT_DIR}/example-profiles" ]]; then
         cp -rn "${SCRIPT_DIR}/example-profiles/"* "${PROFILES_DIR}/" 2>/dev/null || true
     fi
-    echo "default" > "${PROFILES_DIR}/current"
+    echo "caelestia" > "${PROFILES_DIR}/current"
+    echo "caelestia" > "${PROFILES_DIR}/current_keybinds"
+    echo "caelestia" > "${PROFILES_DIR}/default_shell"
+    echo "caelestia" > "${PROFILES_DIR}/default_keybinds"
 fi
 
-# 6. Check PATH
+# 7. Check PATH
 if [[ ":$PATH:" != *":${BIN_DIR}:"* ]]; then
     echo -e "${YELLOW}Notice: ${BIN_DIR} is not in your PATH.${RESET}"
     echo "Add the following to your ~/.bashrc or ~/.zshrc:"
@@ -91,10 +99,11 @@ fi
 
 echo -e "\n${BOLD}${GREEN}✔ Installation complete!${RESET}\n"
 echo -e "You can now run:"
-echo -e "  ${CYAN}shell-switch${RESET}        - Open interactive GUI switcher"
-echo -e "  ${CYAN}shell-switch list${RESET}   - List available shells in terminal"
-echo -e "  ${CYAN}shell-switch <name>${RESET} - Switch instantly to a shell profile"
+echo -e "  ${CYAN}rice${RESET}             - Open interactive GUI switcher"
+echo -e "  ${CYAN}rice list${RESET}        - List available shells in terminal"
+echo -e "  ${CYAN}rice <name>${RESET}      - Switch instantly to a shell profile"
+echo -e "  ${CYAN}rice keybinds${RESET}   - Manage independent keybind profiles"
 echo -e ""
 echo -e "${BOLD}Recommended Hyprland Keybind:${RESET}"
-echo -e "Add this to your ${CYAN}~/.config/hypr/hyprland.conf${RESET}:"
-echo -e "  ${GREEN}bind = SUPER CONTROL, S, exec, desktop-shell-app${RESET}\n"
+echo -e "Built-in: ${GREEN}SUPER + CTRL + R${RESET} opens the Rice Switcher GUI!\n"
+

@@ -47,4 +47,4 @@ _shell_switch_completions() {
     esac
 }
 
-complete -F _shell_switch_completions shell-switch
+complete -F _shell_switch_completions shell-switch rice

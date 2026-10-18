@@ -1,4 +1,4 @@
-#compdef shell-switch
+#compdef shell-switch rice
 
 _shell_switch() {
     local -a commands rices profiles

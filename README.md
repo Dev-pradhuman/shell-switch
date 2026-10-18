@@ -118,31 +118,34 @@ makepkg -si
 
 ## ⌨️ Hyprland Keybinding
 
-Add this single line to your `~/.config/hypr/hyprland.conf`:
+Add this to your `~/.config/hypr/hyprland.conf` (pre-configured in Caelestia keybinds!):
 
 ```hyprlang
-# Open Desktop Shell Switcher (Super + Ctrl + S)
-bind = SUPER CONTROL, S, exec, desktop-shell-app
+# Open Desktop Shell Switcher (Super + Ctrl + R)
+bind = SUPER CONTROL, R, exec, rice gui
+bind = SUPER CONTROL, S, exec, rice gui
 ```
 
-Now press `Super + Ctrl + S` anywhere to bring up the switcher!
+Now press `Super + Ctrl + R` anywhere to bring up the switcher!
 
 ---
 
 ## 💻 Usage
 
 ### 🖥️ Native Libadwaita GUI
-Launch it from your application menu, Hyprland keybinding, or run:
+Launch it from your application menu, Hyprland keybinding (`Super + Ctrl + R`), or run:
 ```bash
-desktop-shell-app
+rice
 # or
-shell-switch gui
+rice gui
+# (or legacy alias: shell-switch gui)
 ```
 
 - **Installed Tab**: View all your installed rices with live running bar badges (`󰍹 Quickshell` / `󰍹 Waybar`).
 - **Live Search (`Ctrl+F`)**: Instant fuzzy search across all your installed profiles.
 - **Explore Rices Tab**: Browse popular community rices and install them with a single click.
 - **Keyboard Shortcuts**:
+  - `Super + Ctrl + R` - Open Switcher GUI anywhere
   - `Ctrl + F` - Focus live search bar
   - `Ctrl + R` - Refresh profile list
   - `Esc` - Close switcher window
@@ -150,56 +153,58 @@ shell-switch gui
 
 ---
 
-### ⌨️ Command Line Interface
+### ⌨️ Command Line Interface (`rice`)
 
 ```bash
 # List all installed shells and active profile
-shell-switch list
+rice list
 
 # Show the currently active shell, keybinds, and defaults
-shell-switch current
+rice current
 
 # Switch to a shell immediately (uses default Caelestia keybinds!)
-shell-switch dms
-shell-switch 44dots
-shell-switch hyde
-shell-switch ml4w
-shell-switch end4
-shell-switch caelestia
+rice dms
+rice 44dots
+rice hyde
+rice ml4w
+rice end4
+rice caelestia
 
 # ⌨️ Independent Keybinds Switching (Decoupled Keybinds)
-shell-switch keybinds                 # View active keybinds profile and available options
-shell-switch keybinds caelestia       # Set Caelestia keybinds across all desktop rices
-shell-switch keybinds match           # Make keybinds follow whatever UI shell is active
-shell-switch dms caelestia            # Hot-swap UI to DMS while keeping Caelestia keybinds!
-shell-switch 44dots hyde              # UI from 44dots, keybinds from HyDE
+rice keybinds                 # View active keybinds profile and available options
+rice keybinds caelestia       # Set Caelestia keybinds across all desktop rices
+rice keybinds match           # Make keybinds follow whatever UI shell is active
+rice dms caelestia            # Hot-swap UI to DMS while keeping Caelestia keybinds!
+rice 44dots hyde              # UI from 44dots, keybinds from HyDE
 
 # ⚙️ Default Desktop & Keybinds Configuration
-shell-switch default                  # View default desktop and keybinds
-shell-switch set-default caelestia    # Set default shell (and its keybinds) for the system
+rice default                  # View default desktop and keybinds
+rice set-default caelestia    # Set default shell (and its keybinds) for the system
 
 # 🚀 Adaptive Launcher & Sidebar Dispatchers
-shell-switch launcher                 # Intelligently toggles active desktop's native launcher
-shell-switch sidebar                  # Intelligently toggles active desktop's native notification center
+rice launcher                 # Intelligently toggles active desktop's native launcher
+rice sidebar                  # Intelligently toggles active desktop's native notification center
 
 # Explore community rice catalog & 1-click install
-shell-switch get            # View available rice catalog
-shell-switch get hyde       # Download and install HyDE rice
-shell-switch get dms        # Download and install DankMaterialShell
+rice get            # View available rice catalog
+rice get hyde       # Download and install HyDE rice
+rice get dms        # Download and install DankMaterialShell
 
 # Backup and Safety Snapshots
-shell-switch backup         # Snapshot your current desktop config to a safe profile
-shell-switch backup my-rice # Snapshot to a custom profile name
+rice backup         # Snapshot your current desktop config to a safe profile
+rice backup my-rice # Snapshot to a custom profile name
 
 # Remove an installed profile
-shell-switch remove 44dots
+rice remove 44dots
 
 # Force restart the current shell
-shell-switch caelestia --force
+rice caelestia --force
 
 # Clone any GitHub dotfiles repo directly as a shell
-shell-switch clone https://github.com/username/my-rice.git my-rice
+rice clone https://github.com/username/my-rice.git my-rice
 ```
+*(Note: `shell-switch` is fully preserved as an alias for backwards compatibility!)*
+
 
 ---
 
