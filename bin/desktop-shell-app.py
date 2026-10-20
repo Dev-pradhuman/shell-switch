@@ -164,6 +164,16 @@ RICE_CATALOG = [
         "preview": None,
     },
     {
+        "id": "end4-pc",
+        "name": "end4-pC (Material 3)",
+        "desc": "Material 3 Expressive desktop fork with Quickshell, presets gallery, dynamic theming & dock",
+        "repo": "https://github.com/pctrade/end4-pC",
+        "bar": "Quickshell",
+        "icon": "preferences-desktop-theme",
+        "tags": ["Quickshell", "Material 3", "Presets Gallery", "Hyprland"],
+        "preview": "assets/preview-end4-pc.png",
+    },
+    {
         "id": "ml4w",
         "name": "ML4W Dotfiles",
         "desc": "MyLinuxForWork modular Hyprland desktop with Waybar themes, settings app & Rofi",
@@ -248,6 +258,7 @@ def load_profile_meta(profile_dir: Path):
         profile_dir / "preview.png",
         profile_dir / "preview.jpg",
         PROJECT_DIR / f"assets/preview-{profile_dir.name}.png",
+        profile_dir / "repo" / "screenshots" / "1.png",
         profile_dir / "repo" / "screenshots" / "hyprland-3.png",
         profile_dir / "repo" / "screenshots" / "hypland.png",
     ]:
@@ -417,6 +428,19 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         backup_btn.connect("clicked", self.on_backup_clicked)
         header.pack_start(backup_btn)
 
+        # Dark / Light Theme Toggle Button
+        current_theme = "dark"
+        theme_file = PROFILES_DIR / "current_theme"
+        if theme_file.exists():
+            current_theme = theme_file.read_text().strip().lower()
+        is_dark = (current_theme == "dark")
+        self.theme_btn = Gtk.Button(
+            icon_name="weather-clear-night-symbolic" if is_dark else "weather-clear-symbolic",
+            tooltip_text=f"Theme: {current_theme.capitalize()} (Click to toggle)",
+        )
+        self.theme_btn.connect("clicked", self.on_theme_toggle_clicked)
+        header.pack_end(self.theme_btn)
+
         # Refresh Button
         refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Refresh List (Ctrl+R)")
         refresh_btn.connect("clicked", lambda b: self.refresh_all())
@@ -506,6 +530,29 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
             return True
         return False
 
+    def on_theme_toggle_clicked(self, btn):
+        def worker():
+            res = subprocess.run([str(SWITCHER_BIN), "theme", "toggle"], capture_output=True, text=True)
+
+            def done():
+                current_theme = "dark"
+                theme_file = PROFILES_DIR / "current_theme"
+                if theme_file.exists():
+                    current_theme = theme_file.read_text().strip().lower()
+
+                is_dark = (current_theme == "dark")
+                self.theme_btn.set_icon_name("weather-clear-night-symbolic" if is_dark else "weather-clear-symbolic")
+                self.theme_btn.set_tooltip_text(f"Theme: {current_theme.capitalize()} (Click to toggle)")
+
+                style_mgr = Adw.StyleManager.get_default()
+                style_mgr.set_color_scheme(Adw.ColorScheme.FORCE_DARK if is_dark else Adw.ColorScheme.FORCE_LIGHT)
+
+                self.toast_overlay.add_toast(Adw.Toast.new(f"Switched theme to: {current_theme.capitalize()}"))
+
+            GLib.idle_add(done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def get_current_shell(self):
         if CURRENT_FILE.exists():
             return CURRENT_FILE.read_text().strip()
@@ -558,9 +605,10 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
 
         # Render Active Profile First, then remaining
         profiles.sort(key=lambda p: (p["id"] != current, p["name"].lower()))
+        all_pids = [p["id"] for p in profiles]
 
         for meta in profiles:
-            card = self.create_profile_card(meta, is_active=(meta["id"] == current))
+            card = self.create_profile_card(meta, is_active=(meta["id"] == current), all_profile_ids=all_pids)
             self.all_profile_cards.append({
                 "widget": card,
                 "meta": meta,
@@ -581,7 +629,7 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
             if matches:
                 visible_count += 1
 
-    def create_profile_card(self, meta, is_active: bool):
+    def create_profile_card(self, meta, is_active: bool, all_profile_ids: list = None):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         card_classes = ["rice-card"]
         if is_active:
@@ -620,16 +668,44 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
         is_kb_active = (meta["id"] == self.get_current_keybinds())
         is_default = (meta["id"] == self.get_default_shell())
 
+        # Keybind profile dropdown selector
+        kb_options = ["Match Shell", "Default"]
+        if all_profile_ids:
+            for pid in all_profile_ids:
+                if pid not in ("match", "default") and pid not in kb_options:
+                    kb_options.append(pid)
+
+        kb_dropdown = Gtk.DropDown.new_from_strings(kb_options)
+        kb_dropdown.set_valign(Gtk.Align.CENTER)
+        kb_dropdown.set_tooltip_text(f"Keybinds profile to pair with {meta['name']}")
+
+        cur_kb = self.get_current_keybinds()
+        if is_active and cur_kb in kb_options:
+            kb_dropdown.set_selected(kb_options.index(cur_kb))
+        else:
+            kb_dropdown.set_selected(0)
+
+        def get_selected_kb():
+            item = kb_dropdown.get_selected_item()
+            txt = item.get_string() if item else "Match Shell"
+            if txt == "Match Shell":
+                return "match"
+            elif txt == "Default":
+                return "default"
+            return txt
+
+        top_row.append(kb_dropdown)
+
         if is_active:
             active_badge = Gtk.Label(label="● Active Shell", css_classes=["badge-active"])
             top_row.append(active_badge)
 
-            reload_btn = Gtk.Button(label="Reload", tooltip_text="Restart current shell")
-            reload_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_switch_clicked(mid, force=True))
+            reload_btn = Gtk.Button(label="Reload", tooltip_text="Restart current shell with selected keybinds")
+            reload_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_switch_clicked(mid, keybinds=get_selected_kb(), force=True))
             top_row.append(reload_btn)
         else:
             switch_btn = Gtk.Button(label="Switch to this Shell", css_classes=["suggested-action", "pill"])
-            switch_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_switch_clicked(mid))
+            switch_btn.connect("clicked", lambda b, mid=meta["id"]: self.on_switch_clicked(mid, keybinds=get_selected_kb()))
             top_row.append(switch_btn)
 
         if is_kb_active:
@@ -849,13 +925,29 @@ class ShellSwitcherWindow(Adw.ApplicationWindow):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def on_switch_clicked(self, profile_id: str, force: bool = False):
-        toast = Adw.Toast.new(f"Switching to '{profile_id}'...")
+    def on_switch_clicked(self, profile_id: str, keybinds: str = None, force: bool = False):
+        msg = f"Switching to '{profile_id}'"
+        if keybinds and keybinds != "match":
+            msg += f" (keybinds: {keybinds})"
+        msg += "..."
+        toast = Adw.Toast.new(msg)
         toast.set_timeout(2)
         self.toast_overlay.add_toast(toast)
 
+        # Auto-Preview (grim): when profile lacks preview, snapshot after bar renders
+        profile_dir = PROFILES_DIR / profile_id
+        if not (profile_dir / "preview.png").exists() and not (profile_dir / "preview.jpg").exists():
+            subprocess.Popen(
+                f'(sleep 2.0 && grim "{profile_dir}/preview.png") &',
+                shell=True,
+            )
+
         def run_switch():
             cmd = [str(SWITCHER_BIN), profile_id]
+            if keybinds and keybinds != "match":
+                cmd.append(keybinds)
+            elif keybinds == "match":
+                cmd.append(profile_id)
             if force:
                 cmd.append("--force")
             res = subprocess.run(cmd, capture_output=True, text=True)
@@ -951,7 +1043,14 @@ class ShellSwitcherApp(Adw.Application):
         )
 
     def do_activate(self):
-        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+        theme_file = PROFILES_DIR / "current_theme"
+        current_theme = "dark"
+        if theme_file.exists():
+            current_theme = theme_file.read_text().strip().lower()
+        if current_theme == "light":
+            Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+        else:
+            Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)
 
         disp = Gdk.Display.get_default()
         if disp:

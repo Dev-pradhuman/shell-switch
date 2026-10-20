@@ -4,8 +4,8 @@ _shell_switch_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="list ls current keybinds default set-default launcher sidebar get backup clone add remove delete rm gui menu help"
-    local rices="caelestia hyde dms end4 ml4w 44dots"
+    local commands="list ls current keybinds default set-default launcher sidebar get backup clone add remove delete rm gui menu help custom doctor wallpaper theme export"
+    local rices="caelestia hyde dms end4 end4-pc ml4w 44dots"
 
     local profiles_dir="${HOME}/.config/desktop-shells"
     local profiles=""
@@ -25,6 +25,25 @@ _shell_switch_completions() {
             ;;
         default|set-default)
             COMPREPLY=( $(compgen -W "${profiles}" -- "${cur}") )
+            return 0
+            ;;
+        doctor|check|diagnose)
+            COMPREPLY=( $(compgen -W "${profiles}" -- "${cur}") )
+            return 0
+            ;;
+        theme)
+            COMPREPLY=( $(compgen -W "dark light toggle" -- "${cur}") )
+            return 0
+            ;;
+        export|bundle)
+            COMPREPLY=( $(compgen -W "${profiles}" -- "${cur}") )
+            return 0
+            ;;
+        wallpaper|wall|bg)
+            COMPREPLY=( $(compgen -f -- "${cur}") )
+            return 0
+            ;;
+        custom)
             return 0
             ;;
         get)

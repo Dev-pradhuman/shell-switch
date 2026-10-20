@@ -61,6 +61,7 @@ The switcher includes battle-tested adapters for popular Linux/Hyprland rice set
 | **DankMaterialShell (DMS)** | Quickshell + Go daemon | Material 3 panels, dock, control center, audio visualizer |
 | **HyDE Project** | Waybar + SwayNC + Rofi | Modular pill/leaf bar, Wallbash color engine, notifications |
 | **end-4 (dots-hyprland)** | Quickshell `ii` suite | Material You widgets, background clocks, Fuzzel launcher |
+| **end4-pC** | Quickshell (M3 Expressive) | Material 3 Expressive, community presets gallery, dynamic theming |
 | **ML4W Dotfiles** | Waybar (Glass) + SwayNC | Floating glass top bar, quicklinks, theme switcher |
 | **44 Dots** | Waybar + SwayNC | Catppuccin Mocha minimal bar with persistent workspaces |
 | **43PR Rice** | Quickshell + Hyprquickpaper | Custom top widget bar, wallpaper switcher |
@@ -168,6 +169,7 @@ rice 44dots
 rice hyde
 rice ml4w
 rice end4
+rice end4-pc
 rice caelestia
 
 # ⌨️ Independent Keybinds Switching (Decoupled Keybinds)

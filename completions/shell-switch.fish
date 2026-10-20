@@ -8,7 +8,7 @@ function __fish_shell_switch_profiles
 end
 
 function __fish_shell_switch_rices
-    echo -e "caelestia\tQuickshell dynamic colors & drawers\nhyde\tHyDE Project modular Waybar rice\ndms\tDankMaterialShell Material 3 dock\nend4\tend-4 Material You Quickshell ii\nml4w\tML4W modular Hyprland desktop\n44dots\t44 Dots Arch Waybar & SwayNC"
+    echo -e "caelestia\tQuickshell dynamic colors & drawers\nhyde\tHyDE Project modular Waybar rice\ndms\tDankMaterialShell Material 3 dock\nend4\tend-4 Material You Quickshell ii\nend4-pc\tMaterial 3 Expressive Quickshell\nml4w\tML4W modular Hyprland desktop\n44dots\t44 Dots Arch Waybar & SwayNC"
 end
 
 # Commands
@@ -29,6 +29,11 @@ for cmd in shell-switch rice
     complete -c $cmd -n "__fish_use_subcommand" -a add -d "Create new shell profile template"
     complete -c $cmd -n "__fish_use_subcommand" -a remove -d "Delete installed profile"
     complete -c $cmd -n "__fish_use_subcommand" -a rm -d "Delete installed profile"
+    complete -c $cmd -n "__fish_use_subcommand" -a custom -d "Open user overlay rules (~/.config/desktop-shells/user-custom.conf)"
+    complete -c $cmd -n "__fish_use_subcommand" -a doctor -d "Run diagnostic health check on environment or profile"
+    complete -c $cmd -n "__fish_use_subcommand" -a wallpaper -d "Set and persist wallpaper across active and future shells"
+    complete -c $cmd -n "__fish_use_subcommand" -a theme -d "Set or toggle global GTK/Matugen/shell color mode"
+    complete -c $cmd -n "__fish_use_subcommand" -a export -d "Export active or named shell profile to tar.gz bundle"
     complete -c $cmd -n "__fish_use_subcommand" -a gui -d "Open Libadwaita GUI app"
     complete -c $cmd -n "__fish_use_subcommand" -a menu -d "Open Rofi/Fuzzel switcher"
     complete -c $cmd -n "__fish_use_subcommand" -a help -d "Show help"
@@ -40,6 +45,9 @@ for cmd in shell-switch rice
     complete -c $cmd -n "__fish_seen_subcommand_from get" -a "(__fish_shell_switch_rices)"
     complete -c $cmd -n "__fish_seen_subcommand_from keybinds" -a "(__fish_shell_switch_profiles) match default" -d "Keybinds profile"
     complete -c $cmd -n "__fish_seen_subcommand_from default set-default" -a "(__fish_shell_switch_profiles)" -d "Default profile"
+    complete -c $cmd -n "__fish_seen_subcommand_from doctor" -a "(__fish_shell_switch_profiles)" -d "Profile to diagnose"
+    complete -c $cmd -n "__fish_seen_subcommand_from export" -a "(__fish_shell_switch_profiles)" -d "Profile to export"
+    complete -c $cmd -n "__fish_seen_subcommand_from theme" -a "dark light toggle" -d "Theme mode"
     complete -c $cmd -n "__fish_seen_subcommand_from remove rm delete" -a "(__fish_shell_switch_profiles)" -d "Profile to delete"
 end
 

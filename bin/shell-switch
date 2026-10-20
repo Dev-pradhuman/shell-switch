@@ -11,9 +11,47 @@ CURRENT_FILE="${PROFILES_DIR}/current"
 CURRENT_KEYBINDS_FILE="${PROFILES_DIR}/current_keybinds"
 DEFAULT_SHELL_FILE="${PROFILES_DIR}/default_shell"
 DEFAULT_KEYBINDS_FILE="${PROFILES_DIR}/default_keybinds"
+USER_CUSTOM_CONF="${PROFILES_DIR}/user-custom.conf"
+CURRENT_WALLPAPER_FILE="${PROFILES_DIR}/current_wallpaper"
+CURRENT_THEME_FILE="${PROFILES_DIR}/current_theme"
 
 # Ensure profiles directory exists
 mkdir -p "${PROFILES_DIR}"
+
+ensure_user_custom_overlay() {
+    local custom_conf="${USER_CUSTOM_CONF}"
+    if [[ ! -f "${custom_conf}" ]]; then
+        cat << 'USEREOF' > "${custom_conf}"
+# ==============================================================================
+# Universal User Overlay: ~/.config/desktop-shells/user-custom.conf
+# ==============================================================================
+# Rules, binds, unbinds, and exec-once commands placed here persist across all
+# desktop shells and rices. This file is sourced at the very end of your active
+# Hyprland configuration, allowing your customizations to cleanly override rice defaults.
+#
+# Examples:
+#   # unbind = SUPER, Q
+#   # bind = SUPER, Q, exec, kitty
+#   # windowrulev2 = opacity 0.95 0.95, class:^(kitty)$
+# ==============================================================================
+USEREOF
+    fi
+
+    local hypr_conf="${HOME}/.config/hypr/hyprland.conf"
+    local source_line="source = ~/.config/desktop-shells/user-custom.conf"
+
+    if [[ -d "${HOME}/.config/hypr" ]]; then
+        if [[ ! -f "${hypr_conf}" && ! -L "${hypr_conf}" ]]; then
+            touch "${hypr_conf}"
+        fi
+        if ! grep -qxF "${source_line}" "${hypr_conf}" 2>/dev/null; then
+            printf "\n%s\n" "${source_line}" >> "${hypr_conf}"
+        fi
+    fi
+}
+
+# Auto-initialize user-custom.conf on first run
+ensure_user_custom_overlay
 
 # Helper colors for terminal output
 BOLD="\033[1m"
@@ -315,6 +353,9 @@ BAKEOF
         ln -sfn "${hypr_to_link}" "${dest_hypr}"
     fi
 
+    # Ensure universal user overlay is injected at the end of active Hyprland config
+    ensure_user_custom_overlay
+
     # 4. Reload Hyprland configuration
     if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
         printf "  Reloading Hyprland...\n"
@@ -328,6 +369,15 @@ BAKEOF
         start_shell || true
     fi
     disown -a 2>/dev/null || true
+
+    # Re-apply saved wallpaper if configured
+    if [[ -f "${CURRENT_WALLPAPER_FILE}" ]]; then
+        local saved_wall
+        saved_wall="$(cat "${CURRENT_WALLPAPER_FILE}" 2>/dev/null || true)"
+        if [[ -n "${saved_wall}" && -f "${saved_wall}" ]]; then
+            ( sleep 0.5 && apply_wallpaper "${saved_wall}" ) >/dev/null 2>&1 &
+        fi
+    fi
 
     # 6. Update current shell & keybind markers
     echo "${target}" > "${CURRENT_FILE}"
@@ -607,6 +657,7 @@ cmd_get() {
         ["hyde"]="https://github.com/HyDE-Project/HyDE"
         ["dms"]="https://github.com/AvengeMedia/DankMaterialShell"
         ["end4"]="https://github.com/end-4/dots-hyprland"
+        ["end4-pc"]="https://github.com/pctrade/end4-pC"
         ["ml4w"]="https://github.com/mylinuxforwork/dotfiles"
         ["44dots"]="https://github.com/44kash/dotfiles"
         ["caelestia"]="https://github.com/caelestia-dots/caelestia"
@@ -616,6 +667,7 @@ cmd_get() {
         ["hyde"]="HyDE Rice"
         ["dms"]="DankMaterialShell"
         ["end4"]="end-4 Dots (illogical-impulse)"
+        ["end4-pc"]="end4-pC (Material 3)"
         ["ml4w"]="ML4W Dotfiles"
         ["44dots"]="44 Dots"
         ["caelestia"]="Caelestia Shell"
@@ -625,6 +677,7 @@ cmd_get() {
         ["hyde"]="Modular HyDE Hyprland rice with Waybar, dynamic themes, Rofi & SwayNC"
         ["dms"]="Material 3 Quickshell desktop shell with dynamic theming & dock"
         ["end4"]="Material You desktop rice with Quickshell 'ii' suite, Matugen & Fuzzel"
+        ["end4-pc"]="Material 3 Expressive desktop fork with Quickshell & community presets gallery"
         ["ml4w"]="MyLinuxForWork modular Hyprland desktop with Waybar themes & Rofi"
         ["44dots"]="Clean Arch Linux & Hyprland rice with Waybar, SwayNC & Rofi"
         ["caelestia"]="Quickshell desktop shell with dynamic colors, drawers & widgets"
@@ -635,7 +688,7 @@ cmd_get() {
         printf "  %-12s %-25s %s\n" "ID" "NAME" "STATUS"
         printf "  %-12s %-25s %s\n" "──" "────" "──────"
 
-        for id in "caelestia" "hyde" "dms" "end4" "ml4w" "44dots"; do
+        for id in "caelestia" "hyde" "dms" "end4" "end4-pc" "ml4w" "44dots"; do
             local status="${MUTED}[Available]${RESET}"
             if [[ -d "${PROFILES_DIR}/${id}" ]]; then
                 if [[ "$(get_current)" == "${id}" ]]; then
@@ -852,6 +905,15 @@ cmd_launcher() {
                 rofi -show drun
             fi
             ;;
+        end4-pc)
+            if pgrep -f "qs -c end4-pC" >/dev/null 2>&1; then
+                qs -c end4-pC ipc call search toggle 2>/dev/null || qs ipc call search toggle 2>/dev/null || true
+            elif command -v fuzzel >/dev/null 2>&1; then
+                fuzzel
+            elif command -v rofi >/dev/null 2>&1; then
+                rofi -show drun
+            fi
+            ;;
         *)
             if command -v rofi >/dev/null 2>&1; then
                 rofi -show drun
@@ -876,6 +938,10 @@ cmd_sidebar() {
         dms ipc call controlCenter toggle 2>/dev/null || dms ipc call notifications toggle 2>/dev/null || true
         return 0
     fi
+    if pgrep -f "qs -c end4-pC" >/dev/null 2>&1; then
+        qs -c end4-pC ipc call sidebarRight toggle 2>/dev/null || qs ipc call sidebarRight toggle 2>/dev/null || true
+        return 0
+    fi
 
     # 2. Otherwise fallback to current profile setting
     local cur
@@ -889,6 +955,9 @@ cmd_sidebar() {
                 dms ipc call controlCenter toggle 2>/dev/null || dms ipc call notifications toggle 2>/dev/null || true
             fi
             ;;
+        end4-pc)
+            qs -c end4-pC ipc call sidebarRight toggle 2>/dev/null || qs ipc call sidebarRight toggle 2>/dev/null || true
+            ;;
         *)
             if command -v swaync-client >/dev/null 2>&1; then
                 swaync-client -t -sw 2>/dev/null || true
@@ -901,6 +970,428 @@ cmd_sidebar() {
     esac
 }
 
+apply_wallpaper() {
+    local path="$1"
+    [[ -f "${path}" ]] || return 0
+
+    # 1. Caelestia
+    if pgrep -f "caelestia" >/dev/null 2>&1 || pgrep -f "qs -c caelestia" >/dev/null 2>&1; then
+        ( timeout 2 caelestia wallpaper -f "${path}" >/dev/null 2>&1 || qs -c caelestia ipc call wallpaper set "${path}" >/dev/null 2>&1 || true ) &
+        if command -v matugen >/dev/null 2>&1; then
+            local mode="dark"
+            [[ -f "${CURRENT_THEME_FILE}" ]] && mode="$(cat "${CURRENT_THEME_FILE}" 2>/dev/null || echo "dark")"
+            ( matugen image -m "${mode}" "${path}" >/dev/null 2>&1 || true ) &
+        fi
+    fi
+
+    # 2. DMS
+    if pgrep -x dms >/dev/null 2>&1 || pgrep -f "dms.*shell" >/dev/null 2>&1; then
+        ( dms ipc call wallpaper set "${path}" >/dev/null 2>&1 || dms wallpaper "${path}" >/dev/null 2>&1 || true ) &
+        if command -v matugen >/dev/null 2>&1; then
+            local mode="dark"
+            [[ -f "${CURRENT_THEME_FILE}" ]] && mode="$(cat "${CURRENT_THEME_FILE}" 2>/dev/null || echo "dark")"
+            ( matugen image -m "${mode}" "${path}" >/dev/null 2>&1 || true ) &
+        fi
+    fi
+
+    # 3. end4-pC
+    if pgrep -f "qs -c end4-pC" >/dev/null 2>&1; then
+        ( qs -c end4-pC ipc call wallpapers apply "${path}" >/dev/null 2>&1 || true ) &
+    fi
+
+    # 3. swww-daemon
+    if pgrep -x swww-daemon >/dev/null 2>&1 || pgrep -x swww >/dev/null 2>&1; then
+        ( swww img "${path}" --transition-type grow --transition-duration 0.7 >/dev/null 2>&1 || true ) &
+    fi
+
+    # 4. hyprpaper
+    if pgrep -x hyprpaper >/dev/null 2>&1; then
+        ( hyprctl hyprpaper preload "${path}" >/dev/null 2>&1 && hyprctl hyprpaper wallpaper ",${path}" >/dev/null 2>&1 || true ) &
+    fi
+
+    # 5. swaybg
+    if pgrep -x swaybg >/dev/null 2>&1; then
+        pkill -x swaybg 2>/dev/null || true
+        setsid swaybg -i "${path}" -m fill >/dev/null 2>&1 &
+    fi
+}
+
+cmd_wallpaper() {
+    local wpath="${1:-}"
+    if [[ -z "${wpath}" ]]; then
+        if [[ -f "${CURRENT_WALLPAPER_FILE}" ]]; then
+            local cur_w
+            cur_w="$(cat "${CURRENT_WALLPAPER_FILE}" 2>/dev/null || true)"
+            printf "Active wallpaper: %s\n" "${cur_w}"
+            if [[ -f "${cur_w}" ]]; then
+                printf "Status: ${GREEN}[OK] File exists${RESET}\n"
+            else
+                printf "Status: ${YELLOW}[WARN] File not found on disk${RESET}\n"
+            fi
+        else
+            printf "No active wallpaper set.\n"
+            printf "Usage: ${GREEN}rice wallpaper <path_to_image>${RESET}\n"
+        fi
+        return 0
+    fi
+
+    if [[ ! -f "${wpath}" ]]; then
+        printf "${RED}Error:${RESET} Wallpaper file '%s' not found.\n" "${wpath}"
+        exit 1
+    fi
+
+    local abs_path
+    abs_path="$(readlink -f "${wpath}")"
+    echo "${abs_path}" > "${CURRENT_WALLPAPER_FILE}"
+    printf "${GREEN}✔ Wallpaper updated:${RESET} %s\n" "${abs_path}"
+    apply_wallpaper "${abs_path}"
+    notify_user "Wallpaper Updated" "${abs_path}" "preferences-desktop-wallpaper"
+}
+
+cmd_theme() {
+    local arg="${1:-}"
+    local cur_theme="dark"
+    if [[ -f "${CURRENT_THEME_FILE}" ]]; then
+        cur_theme="$(cat "${CURRENT_THEME_FILE}" 2>/dev/null || echo "dark")"
+    fi
+
+    local target_theme=""
+    if [[ -z "${arg}" ]]; then
+        printf "Active global theme: ${CYAN}%s${RESET}\n" "${cur_theme}"
+        printf "Usage: ${GREEN}rice theme <dark|light|toggle>${RESET}\n"
+        return 0
+    elif [[ "${arg}" == "toggle" ]]; then
+        if [[ "${cur_theme}" == "dark" ]]; then
+            target_theme="light"
+        else
+            target_theme="dark"
+        fi
+    elif [[ "${arg}" == "dark" || "${arg}" == "light" ]]; then
+        target_theme="${arg}"
+    else
+        printf "${RED}Error:${RESET} Invalid theme '%s'. Must be 'dark', 'light', or 'toggle'.\n" "${arg}"
+        exit 1
+    fi
+
+    echo "${target_theme}" > "${CURRENT_THEME_FILE}"
+    printf "${GREEN}✔ Global theme set to '%s'${RESET}\n" "${target_theme}"
+
+    # 1. Set GTK/GNOME color-scheme via gsettings
+    local gscheme="prefer-dark"
+    [[ "${target_theme}" == "light" ]] && gscheme="prefer-light"
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.interface color-scheme "${gscheme}" 2>/dev/null || true
+        printf "  GTK/GNOME color-scheme set to: %s\n" "${gscheme}"
+    fi
+
+    # 2. Dynamic Matugen palette regeneration
+    if command -v matugen >/dev/null 2>&1 && [[ -f "${CURRENT_WALLPAPER_FILE}" ]]; then
+        local wpath
+        wpath="$(cat "${CURRENT_WALLPAPER_FILE}" 2>/dev/null || true)"
+        if [[ -n "${wpath}" && -f "${wpath}" ]]; then
+            printf "  Regenerating Matugen dynamic colors (%s)...\n" "${target_theme}"
+            matugen image -m "${target_theme}" "${wpath}" >/dev/null 2>&1 &
+        fi
+    fi
+
+    # 3. Active shell IPC notifications
+    if pgrep -f "caelestia" >/dev/null 2>&1 || pgrep -f "qs -c caelestia" >/dev/null 2>&1; then
+        ( qs -c caelestia ipc call theme set "${target_theme}" >/dev/null 2>&1 || caelestia scheme set -m "${target_theme}" >/dev/null 2>&1 || true ) &
+    fi
+    if pgrep -x dms >/dev/null 2>&1 || pgrep -f "dms.*shell" >/dev/null 2>&1; then
+        ( dms ipc call theme set "${target_theme}" >/dev/null 2>&1 || true ) &
+    fi
+
+    notify_user "Theme Switched" "Active theme: ${target_theme}" "preferences-desktop-theme"
+}
+
+cmd_custom() {
+    ensure_user_custom_overlay
+    local editor="${EDITOR:-nano}"
+    "${editor}" "${USER_CUSTOM_CONF}"
+    if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        hyprctl reload >/dev/null 2>&1 || true
+        printf "${GREEN}✔ Hyprland configuration reloaded with user customizations.${RESET}\n"
+    fi
+}
+
+cmd_export() {
+    local arg="${1:-}"
+    local target=""
+    local archive_name=""
+
+    if [[ -z "${arg}" ]]; then
+        target="$(get_current)"
+        archive_name="${target}.tar.gz"
+    elif [[ -d "${PROFILES_DIR}/${arg}" ]]; then
+        target="${arg}"
+        archive_name="${target}.tar.gz"
+    else
+        target="$(get_current)"
+        archive_name="${arg%.tar.gz}.tar.gz"
+    fi
+
+    local target_dir="${PROFILES_DIR}/${target}"
+    if [[ ! -d "${target_dir}" ]]; then
+        printf "${RED}Error:${RESET} Profile '%s' not found in %s\n" "${target}" "${PROFILES_DIR}"
+        exit 1
+    fi
+
+    local output_archive="./${archive_name}"
+
+    printf "${CYAN}→ Packaging profile '%s' into %s...${RESET}\n" "${target}" "${output_archive}"
+
+    # Auto-generate profile.sh if missing
+    if [[ ! -f "${target_dir}/profile.sh" ]]; then
+        printf "  ${YELLOW}Notice: Generating profile.sh manifest for export...${RESET}\n"
+        cat << MANIFEST_EOF > "${target_dir}/profile.sh"
+#!/usr/bin/env bash
+NAME="${target^} Rice"
+DESCRIPTION="Exported desktop shell configuration for ${target}"
+ICON="preferences-desktop-theme"
+
+declare -A CONFIG_MAP=(
+    ["hypr"]="\$PROFILE_DIR/hypr"
+    ["waybar"]="\$PROFILE_DIR/waybar"
+    ["quickshell"]="\$PROFILE_DIR/quickshell"
+)
+
+start_shell() {
+    if [[ -f "\$PROFILE_DIR/waybar/config" ]] && command -v waybar >/dev/null 2>&1; then
+        setsid waybar >/dev/null 2>&1 &
+    elif [[ -d "\$PROFILE_DIR/quickshell" ]] && command -v qs >/dev/null 2>&1; then
+        setsid qs >/dev/null 2>&1 &
+    fi
+}
+
+stop_shell() {
+    pkill -x waybar 2>/dev/null || true
+    pkill -x qs 2>/dev/null || true
+}
+MANIFEST_EOF
+        chmod +x "${target_dir}/profile.sh"
+    fi
+
+    tar -czf "${output_archive}" \
+        -C "${PROFILES_DIR}" \
+        --exclude=".git" \
+        --exclude="__pycache__" \
+        --exclude=".cache" \
+        --exclude="node_modules" \
+        --exclude="*.sock" \
+        "${target}"
+
+    local size
+    size="$(du -h "${output_archive}" | cut -f1)"
+    printf "${GREEN}✔ Successfully exported '%s' to %s (${size})!${RESET}\n" "${target}" "${output_archive}"
+    printf "  Another user can import this directly by extracting into their ~/.config/desktop-shells/\n"
+}
+
+cmd_doctor() {
+    local target_profile="${1:-}"
+    local fail_count=0
+    local warn_count=0
+
+    printf "\n${BOLD}==============================================================================${RESET}\n"
+    if [[ -n "${target_profile}" ]]; then
+        printf "${BOLD}Rice Diagnostic & Health Suite — Profile: ${CYAN}%s${RESET}\n" "${target_profile}"
+    else
+        printf "${BOLD}Rice Diagnostic & Health Suite — System & Active Shell${RESET}\n"
+    fi
+    printf "${BOLD}==============================================================================${RESET}\n\n"
+
+    # 1. Symlink Integrity
+    printf "${BOLD}[1/4] Checking Configuration Symlink Integrity...${RESET}\n"
+    local configs_to_check=("hypr" "waybar" "quickshell")
+    for cfg in "${configs_to_check[@]}"; do
+        local cfg_path="${HOME}/.config/${cfg}"
+        if [[ -L "${cfg_path}" ]]; then
+            local target_dest
+            target_dest="$(readlink "${cfg_path}" 2>/dev/null || echo "")"
+            if [[ -e "${cfg_path}" ]]; then
+                printf "  ${GREEN}[OK]${RESET} ~/.config/%-12s -> %s\n" "${cfg}" "${target_dest}"
+            else
+                printf "  ${RED}[FAIL]${RESET} ~/.config/%-12s -> %s (Dangling symlink!)\n" "${cfg}" "${target_dest}"
+                fail_count=$((fail_count + 1))
+            fi
+        elif [[ -d "${cfg_path}" ]]; then
+            printf "  ${GREEN}[OK]${RESET} ~/.config/%-12s (Regular directory, unmanaged)\n" "${cfg}"
+        else
+            printf "  ${MUTED}[--]${RESET} ~/.config/%-12s (Not present)\n" "${cfg}"
+        fi
+    done
+
+    # If checking specific profile, check its manifest and directory
+    if [[ -n "${target_profile}" ]]; then
+        local pdir="${PROFILES_DIR}/${target_profile}"
+        if [[ ! -d "${pdir}" ]]; then
+            printf "  ${RED}[FAIL]${RESET} Profile directory does not exist: %s\n" "${pdir}"
+            fail_count=$((fail_count + 1))
+        elif [[ ! -f "${pdir}/profile.sh" ]]; then
+            printf "  ${RED}[FAIL]${RESET} Profile manifest missing: %s/profile.sh\n" "${pdir}"
+            fail_count=$((fail_count + 1))
+        else
+            printf "  ${GREEN}[OK]${RESET} Profile manifest verified: %s/profile.sh\n" "${target_profile}"
+        fi
+    fi
+
+    # 2. Core Binaries & Daemons
+    printf "\n${BOLD}[2/4] Checking Core Binaries & Daemons...${RESET}\n"
+
+    # hyprctl
+    if command -v hyprctl >/dev/null 2>&1; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s\n" "hyprctl" "(Hyprland compositor controller)"
+    else
+        printf "  ${RED}[FAIL]${RESET} %-16s %s\n" "hyprctl" "(Required for Hyprland desktop management)"
+        fail_count=$((fail_count + 1))
+    fi
+
+    # quickshell / qs
+    if command -v qs >/dev/null 2>&1 || command -v quickshell >/dev/null 2>&1; then
+        local qsbin
+        qsbin="$(command -v qs 2>/dev/null || command -v quickshell)"
+        printf "  ${GREEN}[OK]${RESET} %-16s %s (%s)\n" "quickshell/qs" "(QML desktop shell runtime)" "${qsbin}"
+    else
+        if [[ "${target_profile}" == "caelestia" || "${target_profile}" == "dms" || "${target_profile}" == "end4" || "${target_profile}" == "end4-pc" ]]; then
+            printf "  ${RED}[FAIL]${RESET} %-16s %s\n" "quickshell/qs" "(Required by profile '${target_profile}')"
+            fail_count=$((fail_count + 1))
+        else
+            printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "quickshell/qs" "(Optional: required for Caelestia/DMS/end-4)"
+            warn_count=$((warn_count + 1))
+        fi
+    fi
+
+    # waybar
+    if command -v waybar >/dev/null 2>&1; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s\n" "waybar" "(Wayland status bar)"
+    else
+        if [[ "${target_profile}" == "hyde" || "${target_profile}" == "ml4w" || "${target_profile}" == "44dots" || "${target_profile}" == "43pr" ]]; then
+            printf "  ${RED}[FAIL]${RESET} %-16s %s\n" "waybar" "(Required by profile '${target_profile}')"
+            fail_count=$((fail_count + 1))
+        else
+            printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "waybar" "(Optional: required for Waybar-based rices)"
+            warn_count=$((warn_count + 1))
+        fi
+    fi
+
+    # swaync
+    if command -v swaync >/dev/null 2>&1 || command -v swaync-client >/dev/null 2>&1; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s\n" "swaync" "(Notification center daemon)"
+    else
+        printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "swaync" "(Notification center for HyDE/44dots)"
+        warn_count=$((warn_count + 1))
+    fi
+
+    # Wallpaper daemons: swww, hyprpaper, swaybg
+    local wall_found=""
+    for wbin in swww hyprpaper swaybg; do
+        if command -v "${wbin}" >/dev/null 2>&1; then
+            wall_found="${wall_found:+${wall_found}, }${wbin}"
+        fi
+    done
+    if [[ -n "${wall_found}" ]]; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s (%s)\n" "wallpaper" "Daemons detected" "${wall_found}"
+    else
+        printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "wallpaper" "Neither swww, hyprpaper, nor swaybg found"
+        warn_count=$((warn_count + 1))
+    fi
+
+    # matugen
+    if command -v matugen >/dev/null 2>&1; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s\n" "matugen" "(Material You dynamic color generator)"
+    else
+        printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "matugen" "(Dynamic Material palette generator)"
+        warn_count=$((warn_count + 1))
+    fi
+
+    # Launchers: rofi, fuzzel, dms
+    local launcher_found=""
+    for lbin in rofi fuzzel dms; do
+        if command -v "${lbin}" >/dev/null 2>&1; then
+            launcher_found="${launcher_found:+${launcher_found}, }${lbin}"
+        fi
+    done
+    if [[ -n "${launcher_found}" ]]; then
+        printf "  ${GREEN}[OK]${RESET} %-16s %s (%s)\n" "launchers" "Available" "${launcher_found}"
+    else
+        printf "  ${YELLOW}[WARN]${RESET} %-16s %s\n" "launchers" "Neither rofi nor fuzzel found"
+        warn_count=$((warn_count + 1))
+    fi
+
+    # System utilities: wpctl, brightnessctl, grim
+    for ubin in wpctl brightnessctl grim; do
+        if command -v "${ubin}" >/dev/null 2>&1; then
+            printf "  ${GREEN}[OK]${RESET} %-16s (Utility available)\n" "${ubin}"
+        else
+            printf "  ${YELLOW}[WARN]${RESET} %-16s (Utility missing — volume/brightness/screenshots may fail)\n" "${ubin}"
+            warn_count=$((warn_count + 1))
+        fi
+    done
+
+    # 3. Fonts
+    printf "\n${BOLD}[3/4] Checking Nerd Fonts & Icon Typography...${RESET}\n"
+    if command -v fc-list >/dev/null 2>&1; then
+        local detected_font=""
+        detected_font="$(fc-list : family 2>/dev/null | grep -iE "nerd font|jetbrainsmono|fontawesome|material" | head -n 1 || true)"
+        if [[ -n "${detected_font}" ]]; then
+            printf "  ${GREEN}[OK]${RESET} Nerd / Icon font detected: %s\n" "${detected_font}"
+        else
+            printf "  ${YELLOW}[WARN]${RESET} No Nerd Fonts detected via fc-list (icons in bars/prompts may fail to render)\n"
+            warn_count=$((warn_count + 1))
+        fi
+    else
+        printf "  ${YELLOW}[WARN]${RESET} fc-list command not found, skipping font verification\n"
+        warn_count=$((warn_count + 1))
+    fi
+
+    # 4. IPC Socket & Write Permissions
+    printf "\n${BOLD}[4/4] Checking Live IPC & Directory Permissions...${RESET}\n"
+    if command -v hyprctl >/dev/null 2>&1 && hyprctl version >/dev/null 2>&1; then
+        local hversion
+        hversion="$(hyprctl version 2>/dev/null | head -n 1 || echo "active")"
+        printf "  ${GREEN}[OK]${RESET} Hyprland IPC socket is responsive (%s)\n" "${hversion}"
+    else
+        if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+            printf "  ${RED}[FAIL]${RESET} Hyprland IPC socket not responding (WAYLAND_DISPLAY set but hyprctl version failed)\n"
+            fail_count=$((fail_count + 1))
+        else
+            printf "  ${YELLOW}[WARN]${RESET} Hyprland not currently running (IPC unavailable in headless session)\n"
+            warn_count=$((warn_count + 1))
+        fi
+    fi
+
+    # Write permissions on ~/.config/desktop-shells
+    if [[ -d "${PROFILES_DIR}" && -w "${PROFILES_DIR}" ]]; then
+        printf "  ${GREEN}[OK]${RESET} Write permission: %s\n" "${PROFILES_DIR}"
+    elif [[ ! -d "${PROFILES_DIR}" && -w "${HOME}/.config" ]]; then
+        printf "  ${GREEN}[OK]${RESET} Write permission: %s (creatable in ~/.config)\n" "${PROFILES_DIR}"
+    else
+        printf "  ${RED}[FAIL]${RESET} No write permission on %s\n" "${PROFILES_DIR}"
+        fail_count=$((fail_count + 1))
+    fi
+
+    # Write permissions on ~/.config/matugen
+    local matugen_dir="${HOME}/.config/matugen"
+    if [[ -d "${matugen_dir}" && -w "${matugen_dir}" ]]; then
+        printf "  ${GREEN}[OK]${RESET} Write permission: %s\n" "${matugen_dir}"
+    elif [[ -w "${HOME}/.config" ]]; then
+        printf "  ${GREEN}[OK]${RESET} Write permission: %s (creatable in ~/.config)\n" "${matugen_dir}"
+    else
+        printf "  ${RED}[FAIL]${RESET} No write permission on %s\n" "${matugen_dir}"
+        fail_count=$((fail_count + 1))
+    fi
+
+    # Summary
+    printf "\n${BOLD}Health Summary:${RESET} "
+    if [[ "${fail_count}" -eq 0 ]]; then
+        printf "${GREEN}HEALTHY [0 Failures, %d Warnings]${RESET}\n\n" "${warn_count}"
+        return 0
+    else
+        printf "${RED}UNHEALTHY [%d Failures, %d Warnings]${RESET}\n\n" "${fail_count}" "${warn_count}"
+        return 1
+    fi
+}
+
 cmd_help() {
     printf "\n${BOLD}Desktop Shell Switcher (${CYAN}rice${RESET}${BOLD} / ${CYAN}shell-switch${RESET}${BOLD})${RESET}\n"
     printf "Instantly switch between Caelestia, DankMaterialShell, 44 Dots, and other desktop rices.\n\n"
@@ -911,6 +1402,11 @@ cmd_help() {
     printf "  ${GREEN}rice set-default <shell>${RESET} Set your default desktop shell & keybinds\n"
     printf "  ${GREEN}rice list${RESET} (or ${GREEN}ls${RESET})        List all available shell profiles\n"
     printf "  ${GREEN}rice current${RESET}             Show active shell, keybinds, and defaults\n"
+    printf "  ${GREEN}rice custom${RESET}              Open user overlay rules (~/.config/desktop-shells/user-custom.conf)\n"
+    printf "  ${GREEN}rice doctor [shell]${RESET}      Run diagnostic health check on environment or profile\n"
+    printf "  ${GREEN}rice wallpaper [path]${RESET}    Set and persist wallpaper across active and future shells\n"
+    printf "  ${GREEN}rice theme <dark|light|toggle>${RESET} Set or toggle global GTK/Matugen/shell color mode\n"
+    printf "  ${GREEN}rice export [name]${RESET}       Export active or named shell profile to tar.gz bundle\n"
     printf "  ${GREEN}rice launcher${RESET}            Launch active desktop's native app launcher\n"
     printf "  ${GREEN}rice sidebar${RESET}             Toggle active desktop's notification/sidebar\n"
     printf "  ${GREEN}rice get [rice_id]${RESET}       Explore or 1-click install popular rices\n"
@@ -944,6 +1440,21 @@ case "${ACTION}" in
         ;;
     current)
         cmd_current
+        ;;
+    custom)
+        cmd_custom
+        ;;
+    doctor|check|diagnose)
+        cmd_doctor "${2:-}"
+        ;;
+    wallpaper|wall|bg)
+        cmd_wallpaper "${2:-}"
+        ;;
+    theme)
+        cmd_theme "${2:-}"
+        ;;
+    export|bundle)
+        cmd_export "${2:-}"
         ;;
     keybinds|binds|keys)
         cmd_keybinds "${2:-}"

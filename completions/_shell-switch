@@ -12,6 +12,11 @@ _shell_switch() {
         'set-default:Set default shell & keybinds'
         'launcher:Launch active desktop native app launcher'
         'sidebar:Toggle active desktop native notification sidebar'
+        'custom:Open user overlay rules (~/.config/desktop-shells/user-custom.conf)'
+        'doctor:Run diagnostic health check on environment or profile'
+        'wallpaper:Set and persist wallpaper across active and future shells'
+        'theme:Set or toggle global GTK/Matugen/shell color mode'
+        'export:Export active or named shell profile to tar.gz bundle'
         'get:Download and install a popular desktop rice'
         'backup:Create a snapshot of current desktop configuration'
         'clone:Clone a GitHub dotfiles repository as a shell profile'
@@ -28,6 +33,7 @@ _shell_switch() {
         'hyde:HyDE Project modular desktop with Waybar & dynamic themes'
         'dms:Material 3 Quickshell desktop shell with dock'
         'end4:end-4 Material You desktop with Quickshell ii suite'
+        'end4-pc:Material 3 Expressive desktop fork with presets gallery'
         'ml4w:MyLinuxForWork modular Hyprland desktop with Waybar & Rofi'
         '44dots:Arch Linux & Hyprland rice with Waybar & SwayNC'
     )
@@ -57,6 +63,22 @@ _shell_switch() {
                     ;;
                 default|set-default)
                     _describe -t profiles 'default shell' profiles
+                    ;;
+                doctor|check|diagnose)
+                    _describe -t profiles 'profile to diagnose' profiles
+                    ;;
+                theme)
+                    local -a themes
+                    themes=('dark:Switch to dark theme' 'light:Switch to light theme' 'toggle:Toggle between dark and light')
+                    _describe -t themes 'theme mode' themes
+                    ;;
+                export|bundle)
+                    _describe -t profiles 'profile to export' profiles
+                    ;;
+                wallpaper|wall|bg)
+                    _files -g "*.{png,jpg,jpeg,webp}"
+                    ;;
+                custom)
                     ;;
                 get)
                     _describe -t rices 'available rice' rices
